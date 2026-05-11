@@ -30,11 +30,14 @@ def match_product(
     menu: Iterable[MenuItem],
     product: Product,
 ) -> Optional[MenuItem]:
-    """Primer item cuyo nombre contiene una keyword Y precio en rango."""
+    """Primer item con keyword + precio en rango y sin exclude_keywords."""
     kws = _keywords(product)
+    excludes = [_normalize(k) for k in product.exclude_keywords if k.strip()]
     for item in menu:
         name = _normalize(item.name_raw)
         if not any(kw in name for kw in kws):
+            continue
+        if excludes and any(ex in name for ex in excludes):
             continue
         if not (product.price_min_mxn <= item.unit_price_mxn <= product.price_max_mxn):
             continue

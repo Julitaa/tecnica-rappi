@@ -1,6 +1,6 @@
-sku,canonical_name,vertical,search_keywords,price_min_mxn,price_max_mxn
-big_mac,Big Mac,fast_food,"big mac|bigmac",80,150
-mcombo_bigmac_med,Combo Big Mac mediano,fast_food,"combo big mac|mccombo big mac|big mac mediano|big mac med",150,250
-mcnuggets_10,McNuggets 10 piezas,fast_food,"nuggets 10|10 piezas|10 pz|nuggets x10|mcnuggets 10",60,150
-cocacola_500ml,Coca-Cola 500ml,retail,"coca cola 500|coca-cola 500|cocacola 500|coca 500",20,50
-agua_1l,Agua embotellada 1L,retail,"agua 1l|agua 1 l|agua natural 1|bonafont 1l|ciel 1l|epura 1l",15,40
+sku,canonical_name,vertical,search_keywords,price_min_mxn,price_max_mxn,exclude_keywords
+big_mac,Big Mac,fast_food,"big mac|bigmac",80,150,"mctrio|mc trio|mctrío|combo|trio|mccombo|cuarteto"
+mcombo_bigmac_med,Combo Big Mac mediano,fast_food,"combo big mac|mctrio big mac|mctrío big mac|big mac mediano|big mac med",150,250,"grande|gigante"
+mcnuggets_10,McNuggets 10 piezas,fast_food,"nuggets 10|10 piezas|10 pz|nuggets x10|mcnuggets 10",60,150,"4 pz|4 piezas|6 pz|6 piezas|20 pz|20 piezas"
+cocacola_500ml,Coca-Cola 500ml,retail,"coca cola 500|coca-cola 500|cocacola 500|coca 500",20,50,
+agua_1l,Agua embotellada 1L,retail,"agua 1l|agua 1 l|agua natural 1|bonafont 1l|ciel 1l|epura 1l",15,40,

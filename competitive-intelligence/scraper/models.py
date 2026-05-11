@@ -32,6 +32,7 @@ class Product:
     search_keywords: tuple[str, ...]
     price_min_mxn: float
     price_max_mxn: float
+    exclude_keywords: tuple[str, ...] = ()
 
 
 @dataclass

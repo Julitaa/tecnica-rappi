@@ -41,6 +41,11 @@ def load_products(path: Path | None = None) -> list[Product]:
                 ),
                 price_min_mxn=float(row["price_min_mxn"]),
                 price_max_mxn=float(row["price_max_mxn"]),
+                exclude_keywords=tuple(
+                    k.strip()
+                    for k in (row.get("exclude_keywords") or "").split("|")
+                    if k.strip()
+                ),
             )
             for row in reader
         ]
