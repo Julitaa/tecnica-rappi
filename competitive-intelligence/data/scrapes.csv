@@ -1,0 +1,91 @@
+scrape_id,timestamp_utc,platform,address_id,address_label,store_id,store_name,product_sku,product_name_raw,unit_price_mxn,delivery_fee_mxn,service_fee_mxn,discount_mxn,total_final_mxn,eta_min,eta_min_low,eta_min_high,available,promo_text,collection_method,notes
+8a433221-c9ea-49a2-87d7-c70f5fe655da,2026-05-11T20:57:24.321956+00:00,rappi,1,Polanco,,,big_mac,,,,,,,,,,False,,api,stub:tramo1
+6abe4f00-4547-4f7c-97f9-150959c323b0,2026-05-11T20:57:24.321977+00:00,rappi,1,Polanco,,,mcombo_bigmac_med,,,,,,,,,,False,,api,stub:tramo1
+b8d2f5ca-875f-44d4-9a7d-4322c62281e6,2026-05-11T20:57:24.321986+00:00,rappi,1,Polanco,,,mcnuggets_10,,,,,,,,,,False,,api,stub:tramo1
+55971200-326d-4bc7-b537-ec550d4bc5fe,2026-05-11T20:57:24.321995+00:00,rappi,1,Polanco,,,cocacola_500ml,,,,,,,,,,False,,api,stub:tramo1
+aeeb1152-3f38-4139-80dc-6837aca714f9,2026-05-11T20:57:24.322002+00:00,rappi,1,Polanco,,,agua_1l,,,,,,,,,,False,,api,stub:tramo1
+0d490ce9-62d3-41d9-b555-6c70267d2e1f,2026-05-11T20:57:25.830707+00:00,rappi,2,Roma Norte,,,big_mac,,,,,,,,,,False,,api,stub:tramo1
+b289e80f-6db1-4f7e-9b29-0bb3e4da9a5f,2026-05-11T20:57:25.830742+00:00,rappi,2,Roma Norte,,,mcombo_bigmac_med,,,,,,,,,,False,,api,stub:tramo1
+34f4668d-09b1-44f7-a7b2-9b41b3c93cb0,2026-05-11T20:57:25.830759+00:00,rappi,2,Roma Norte,,,mcnuggets_10,,,,,,,,,,False,,api,stub:tramo1
+b49a3a5f-17d2-4a31-8bdb-2640ea8eb7b8,2026-05-11T20:57:25.830773+00:00,rappi,2,Roma Norte,,,cocacola_500ml,,,,,,,,,,False,,api,stub:tramo1
+1d05ad3a-797a-43e8-9bbb-780088575f9b,2026-05-11T20:57:25.830781+00:00,rappi,2,Roma Norte,,,agua_1l,,,,,,,,,,False,,api,stub:tramo1
+52834002-1b9f-4ad8-9ded-25e59cd4c496,2026-05-11T20:57:27.334308+00:00,rappi,3,Del Valle,,,big_mac,,,,,,,,,,False,,api,stub:tramo1
+4f053d6d-6854-4fdc-9710-046c6e667d12,2026-05-11T20:57:27.334324+00:00,rappi,3,Del Valle,,,mcombo_bigmac_med,,,,,,,,,,False,,api,stub:tramo1
+e76c1561-d934-4e67-8e2d-060b272f7785,2026-05-11T20:57:27.334331+00:00,rappi,3,Del Valle,,,mcnuggets_10,,,,,,,,,,False,,api,stub:tramo1
+94864a8b-25af-43d6-9d72-4c997bbbd974,2026-05-11T20:57:27.334342+00:00,rappi,3,Del Valle,,,cocacola_500ml,,,,,,,,,,False,,api,stub:tramo1
+a41b8e2f-28ab-4b69-92af-3c757e4aa7fa,2026-05-11T20:57:27.334349+00:00,rappi,3,Del Valle,,,agua_1l,,,,,,,,,,False,,api,stub:tramo1
+3c89a810-3982-43b4-b009-ce4ede8b2cfe,2026-05-11T20:57:28.840829+00:00,rappi,4,Iztapalapa,,,big_mac,,,,,,,,,,False,,api,stub:tramo1
+9265753f-54f1-4d33-b39a-d5cc02371dce,2026-05-11T20:57:28.840908+00:00,rappi,4,Iztapalapa,,,mcombo_bigmac_med,,,,,,,,,,False,,api,stub:tramo1
+8bb07976-3398-4948-ab60-1fed90b6d0a1,2026-05-11T20:57:28.840955+00:00,rappi,4,Iztapalapa,,,mcnuggets_10,,,,,,,,,,False,,api,stub:tramo1
+72be3be6-b68e-49b4-87da-6fc4c43ee6e1,2026-05-11T20:57:28.841000+00:00,rappi,4,Iztapalapa,,,cocacola_500ml,,,,,,,,,,False,,api,stub:tramo1
+d250b991-3c9d-4df8-8314-d084590d4d6d,2026-05-11T20:57:28.841042+00:00,rappi,4,Iztapalapa,,,agua_1l,,,,,,,,,,False,,api,stub:tramo1
+6140a507-fcf5-4408-b14e-91d8a0db4c9a,2026-05-11T20:57:30.367483+00:00,rappi,5,Santa Fe,,,big_mac,,,,,,,,,,False,,api,stub:tramo1
+0d724849-df5c-4c04-83a4-d1579e13d6f7,2026-05-11T20:57:30.367508+00:00,rappi,5,Santa Fe,,,mcombo_bigmac_med,,,,,,,,,,False,,api,stub:tramo1
+0de7c525-a97b-4f2f-9631-d01d78a0b552,2026-05-11T20:57:30.367520+00:00,rappi,5,Santa Fe,,,mcnuggets_10,,,,,,,,,,False,,api,stub:tramo1
+44b46fca-da85-45dc-9d28-05cb65309333,2026-05-11T20:57:30.367529+00:00,rappi,5,Santa Fe,,,cocacola_500ml,,,,,,,,,,False,,api,stub:tramo1
+afadbc2c-22f2-466a-b25c-3bb7a6744f92,2026-05-11T20:57:30.367539+00:00,rappi,5,Santa Fe,,,agua_1l,,,,,,,,,,False,,api,stub:tramo1
+45355551-a404-45c6-bdf2-98ecca4130d3,2026-05-11T20:57:31.875349+00:00,rappi,6,Cuautitlan Izcalli,,,big_mac,,,,,,,,,,False,,api,stub:tramo1
+3828c59b-3cac-4f58-85a5-bf0e24061d1a,2026-05-11T20:57:31.875380+00:00,rappi,6,Cuautitlan Izcalli,,,mcombo_bigmac_med,,,,,,,,,,False,,api,stub:tramo1
+04543be1-9a6b-4149-8790-14b39181f8cd,2026-05-11T20:57:31.875397+00:00,rappi,6,Cuautitlan Izcalli,,,mcnuggets_10,,,,,,,,,,False,,api,stub:tramo1
+3229f1d7-906f-4815-b560-70194dcc8c4b,2026-05-11T20:57:31.875410+00:00,rappi,6,Cuautitlan Izcalli,,,cocacola_500ml,,,,,,,,,,False,,api,stub:tramo1
+64ea83cf-ee61-41f1-a950-3817d57ac73c,2026-05-11T20:57:31.875423+00:00,rappi,6,Cuautitlan Izcalli,,,agua_1l,,,,,,,,,,False,,api,stub:tramo1
+044bcac6-e100-464f-86b3-6b429570f7fd,2026-05-11T20:57:24.322200+00:00,ubereats,1,Polanco,,,big_mac,,,,,,,,,,False,,playwright,stub:tramo1
+7b5db79c-14de-4f95-ab13-452778f07b7c,2026-05-11T20:57:24.322210+00:00,ubereats,1,Polanco,,,mcombo_bigmac_med,,,,,,,,,,False,,playwright,stub:tramo1
+f9af1b50-a345-4833-9037-e6411c812ffd,2026-05-11T20:57:24.322219+00:00,ubereats,1,Polanco,,,mcnuggets_10,,,,,,,,,,False,,playwright,stub:tramo1
+3d56e35b-f6ad-4f3a-bcac-a57d452bc8f7,2026-05-11T20:57:24.322225+00:00,ubereats,1,Polanco,,,cocacola_500ml,,,,,,,,,,False,,playwright,stub:tramo1
+a7ce9150-0343-4d1b-855e-634097aebe8d,2026-05-11T20:57:24.322233+00:00,ubereats,1,Polanco,,,agua_1l,,,,,,,,,,False,,playwright,stub:tramo1
+533ac84b-bef0-4d03-b617-135fd0d70c80,2026-05-11T20:57:25.830842+00:00,ubereats,2,Roma Norte,,,big_mac,,,,,,,,,,False,,playwright,stub:tramo1
+42885aeb-58ec-408f-9b92-b063684c619e,2026-05-11T20:57:25.830853+00:00,ubereats,2,Roma Norte,,,mcombo_bigmac_med,,,,,,,,,,False,,playwright,stub:tramo1
+a6497c6f-29a9-4b86-b9cd-da303cc10dfa,2026-05-11T20:57:25.830863+00:00,ubereats,2,Roma Norte,,,mcnuggets_10,,,,,,,,,,False,,playwright,stub:tramo1
+0fcdc396-fccf-442c-9cbb-ea92d43e8fc9,2026-05-11T20:57:25.830873+00:00,ubereats,2,Roma Norte,,,cocacola_500ml,,,,,,,,,,False,,playwright,stub:tramo1
+cd2d3d2a-637d-43f6-b5cb-cf96c97d9ac9,2026-05-11T20:57:25.830881+00:00,ubereats,2,Roma Norte,,,agua_1l,,,,,,,,,,False,,playwright,stub:tramo1
+04253e45-2361-4c35-9c70-923b9897012b,2026-05-11T20:57:27.334376+00:00,ubereats,3,Del Valle,,,big_mac,,,,,,,,,,False,,playwright,stub:tramo1
+a17eb7b1-b770-45b4-a806-520a279d3020,2026-05-11T20:57:27.334382+00:00,ubereats,3,Del Valle,,,mcombo_bigmac_med,,,,,,,,,,False,,playwright,stub:tramo1
+d00e8538-caf0-48c0-b483-bf6c562583b2,2026-05-11T20:57:27.334388+00:00,ubereats,3,Del Valle,,,mcnuggets_10,,,,,,,,,,False,,playwright,stub:tramo1
+067d7bbf-1bd6-461b-a34e-42afce1f0292,2026-05-11T20:57:27.334394+00:00,ubereats,3,Del Valle,,,cocacola_500ml,,,,,,,,,,False,,playwright,stub:tramo1
+2d45dbd7-861f-4590-93a6-f5035ec59842,2026-05-11T20:57:27.334399+00:00,ubereats,3,Del Valle,,,agua_1l,,,,,,,,,,False,,playwright,stub:tramo1
+a1393b65-9c7f-4e71-8fe6-6d6ee560a228,2026-05-11T20:57:28.841183+00:00,ubereats,4,Iztapalapa,,,big_mac,,,,,,,,,,False,,playwright,stub:tramo1
+71f88afb-0396-4f16-a7f7-6063c22bebe9,2026-05-11T20:57:28.841220+00:00,ubereats,4,Iztapalapa,,,mcombo_bigmac_med,,,,,,,,,,False,,playwright,stub:tramo1
+682b60bc-fe73-4c4e-9500-6406e2b44cb9,2026-05-11T20:57:28.841285+00:00,ubereats,4,Iztapalapa,,,mcnuggets_10,,,,,,,,,,False,,playwright,stub:tramo1
+99512ba7-8af4-4289-a4f7-386bbf4c49e8,2026-05-11T20:57:28.841322+00:00,ubereats,4,Iztapalapa,,,cocacola_500ml,,,,,,,,,,False,,playwright,stub:tramo1
+9abaa013-54b7-483b-b516-c5234c0435c4,2026-05-11T20:57:28.841349+00:00,ubereats,4,Iztapalapa,,,agua_1l,,,,,,,,,,False,,playwright,stub:tramo1
+57270091-1fb9-49d0-909b-7887f768d25e,2026-05-11T20:57:30.367595+00:00,ubereats,5,Santa Fe,,,big_mac,,,,,,,,,,False,,playwright,stub:tramo1
+e8c5a84a-203e-4069-89c4-51a6075b9fc8,2026-05-11T20:57:30.367607+00:00,ubereats,5,Santa Fe,,,mcombo_bigmac_med,,,,,,,,,,False,,playwright,stub:tramo1
+e8b287b9-4323-42c4-b48e-6ab2402f3ecd,2026-05-11T20:57:30.367620+00:00,ubereats,5,Santa Fe,,,mcnuggets_10,,,,,,,,,,False,,playwright,stub:tramo1
+8ffa00f6-25b3-4e7f-bed1-44a090406d67,2026-05-11T20:57:30.367636+00:00,ubereats,5,Santa Fe,,,cocacola_500ml,,,,,,,,,,False,,playwright,stub:tramo1
+e0863c80-d6eb-4a02-9091-c71deebee849,2026-05-11T20:57:30.367649+00:00,ubereats,5,Santa Fe,,,agua_1l,,,,,,,,,,False,,playwright,stub:tramo1
+46686d80-42fc-40f7-a829-908b8766d276,2026-05-11T20:57:31.875476+00:00,ubereats,6,Cuautitlan Izcalli,,,big_mac,,,,,,,,,,False,,playwright,stub:tramo1
+92ceba10-2377-4aac-8623-24f90b9d2541,2026-05-11T20:57:31.875498+00:00,ubereats,6,Cuautitlan Izcalli,,,mcombo_bigmac_med,,,,,,,,,,False,,playwright,stub:tramo1
+ce8ad6b0-ea47-4396-8355-371a4294a1a6,2026-05-11T20:57:31.875511+00:00,ubereats,6,Cuautitlan Izcalli,,,mcnuggets_10,,,,,,,,,,False,,playwright,stub:tramo1
+bba11c5b-96ad-4412-94dd-5e9f64e7ebca,2026-05-11T20:57:31.875524+00:00,ubereats,6,Cuautitlan Izcalli,,,cocacola_500ml,,,,,,,,,,False,,playwright,stub:tramo1
+aa4e456e-8b7b-45d6-a6bb-d421cb29604c,2026-05-11T20:57:31.875540+00:00,ubereats,6,Cuautitlan Izcalli,,,agua_1l,,,,,,,,,,False,,playwright,stub:tramo1
+f3103ced-c2a3-486d-9743-f957bbbcbb23,2026-05-11T20:57:24.322254+00:00,didi,1,Polanco,,,big_mac,,,,,,,,,,False,,api,stub:tramo1
+1b241f7a-2c9f-4460-854e-bb88d329bf33,2026-05-11T20:57:24.322261+00:00,didi,1,Polanco,,,mcombo_bigmac_med,,,,,,,,,,False,,api,stub:tramo1
+4c11362f-2255-4bcc-bf23-ff9a4966f0b0,2026-05-11T20:57:24.322266+00:00,didi,1,Polanco,,,mcnuggets_10,,,,,,,,,,False,,api,stub:tramo1
+7fe75a71-f6d3-42d9-a1e1-b8f4cf1ff3c0,2026-05-11T20:57:24.322272+00:00,didi,1,Polanco,,,cocacola_500ml,,,,,,,,,,False,,api,stub:tramo1
+af59ef3e-1102-4d0f-b889-0deb86671c2b,2026-05-11T20:57:24.322278+00:00,didi,1,Polanco,,,agua_1l,,,,,,,,,,False,,api,stub:tramo1
+12c7053b-0c3c-4085-bb73-caa523a792b4,2026-05-11T20:57:25.830907+00:00,didi,2,Roma Norte,,,big_mac,,,,,,,,,,False,,api,stub:tramo1
+fafc13ab-9562-4cdf-921e-6595f8e6650f,2026-05-11T20:57:25.830918+00:00,didi,2,Roma Norte,,,mcombo_bigmac_med,,,,,,,,,,False,,api,stub:tramo1
+12467cc2-d17a-4343-901c-ba2382494ee3,2026-05-11T20:57:25.830927+00:00,didi,2,Roma Norte,,,mcnuggets_10,,,,,,,,,,False,,api,stub:tramo1
+25e75bd1-f446-4210-8266-ccf2c518b69f,2026-05-11T20:57:25.830936+00:00,didi,2,Roma Norte,,,cocacola_500ml,,,,,,,,,,False,,api,stub:tramo1
+33f63fa8-7633-45d6-a728-853882712969,2026-05-11T20:57:25.830945+00:00,didi,2,Roma Norte,,,agua_1l,,,,,,,,,,False,,api,stub:tramo1
+5738fa09-1e57-4ec2-a73c-5a89451ea64a,2026-05-11T20:57:27.334415+00:00,didi,3,Del Valle,,,big_mac,,,,,,,,,,False,,api,stub:tramo1
+720cb38d-cf84-4b0a-bb1e-07b63429f1f5,2026-05-11T20:57:27.334421+00:00,didi,3,Del Valle,,,mcombo_bigmac_med,,,,,,,,,,False,,api,stub:tramo1
+b828825e-5b75-4951-b080-8854de425d0c,2026-05-11T20:57:27.334426+00:00,didi,3,Del Valle,,,mcnuggets_10,,,,,,,,,,False,,api,stub:tramo1
+cd81fc82-3154-4212-957c-1249b967ded2,2026-05-11T20:57:27.334446+00:00,didi,3,Del Valle,,,cocacola_500ml,,,,,,,,,,False,,api,stub:tramo1
+3dfe696d-4cee-4781-8d9d-fb3612306812,2026-05-11T20:57:27.334451+00:00,didi,3,Del Valle,,,agua_1l,,,,,,,,,,False,,api,stub:tramo1
+e6b0febd-3264-4bbe-84b0-dcd0538908ef,2026-05-11T20:57:28.841432+00:00,didi,4,Iztapalapa,,,big_mac,,,,,,,,,,False,,api,stub:tramo1
+1b64dbd2-1a06-4fc6-9d77-3a8559129ffd,2026-05-11T20:57:28.841460+00:00,didi,4,Iztapalapa,,,mcombo_bigmac_med,,,,,,,,,,False,,api,stub:tramo1
+57ffd08d-877f-4234-a0aa-3cf8fa75cc75,2026-05-11T20:57:28.841490+00:00,didi,4,Iztapalapa,,,mcnuggets_10,,,,,,,,,,False,,api,stub:tramo1
+6289fb03-c474-4141-ae06-3d034f877441,2026-05-11T20:57:28.841515+00:00,didi,4,Iztapalapa,,,cocacola_500ml,,,,,,,,,,False,,api,stub:tramo1
+b00ba808-ff5f-4199-8483-b1d94b7e9978,2026-05-11T20:57:28.841558+00:00,didi,4,Iztapalapa,,,agua_1l,,,,,,,,,,False,,api,stub:tramo1
+65fb5341-409f-47dd-a6a5-6f44a6d0df4b,2026-05-11T20:57:30.367773+00:00,didi,5,Santa Fe,,,big_mac,,,,,,,,,,False,,api,stub:tramo1
+3a02ccc9-56ad-4bf7-aca2-49be41d95c36,2026-05-11T20:57:30.367812+00:00,didi,5,Santa Fe,,,mcombo_bigmac_med,,,,,,,,,,False,,api,stub:tramo1
+fd9eb17d-119e-448b-b71d-b063aa82ddb0,2026-05-11T20:57:30.367837+00:00,didi,5,Santa Fe,,,mcnuggets_10,,,,,,,,,,False,,api,stub:tramo1
+c208d44e-409e-4470-826b-35788f203422,2026-05-11T20:57:30.367862+00:00,didi,5,Santa Fe,,,cocacola_500ml,,,,,,,,,,False,,api,stub:tramo1
+3de6d6de-07c7-4cde-8b7a-24ef3a66c724,2026-05-11T20:57:30.367888+00:00,didi,5,Santa Fe,,,agua_1l,,,,,,,,,,False,,api,stub:tramo1
+afea8834-879a-401c-b8f8-99c8e3fae4c8,2026-05-11T20:57:31.875582+00:00,didi,6,Cuautitlan Izcalli,,,big_mac,,,,,,,,,,False,,api,stub:tramo1
+643d872f-492e-4ccb-925c-679d76dbe4c4,2026-05-11T20:57:31.875597+00:00,didi,6,Cuautitlan Izcalli,,,mcombo_bigmac_med,,,,,,,,,,False,,api,stub:tramo1
+59fac816-ed23-4a21-a71b-3689c176c870,2026-05-11T20:57:31.875608+00:00,didi,6,Cuautitlan Izcalli,,,mcnuggets_10,,,,,,,,,,False,,api,stub:tramo1
+4cdef7eb-fdfb-4989-adc4-12fce09d5fe6,2026-05-11T20:57:31.875620+00:00,didi,6,Cuautitlan Izcalli,,,cocacola_500ml,,,,,,,,,,False,,api,stub:tramo1
+5d10cf16-a648-4f32-8e27-dcbcc52fa17b,2026-05-11T20:57:31.875632+00:00,didi,6,Cuautitlan Izcalli,,,agua_1l,,,,,,,,,,False,,api,stub:tramo1

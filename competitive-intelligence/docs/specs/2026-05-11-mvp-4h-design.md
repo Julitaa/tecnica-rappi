@@ -10,7 +10,7 @@
 
 Construir en 4 horas un pipeline ejecutable con un solo comando que:
 
-1. Scrapea precio unitario, delivery fee, service fee, descuento y ETA de **3 productos estandarizados** en **3 plataformas** (Rappi, Uber Eats, DiDi Food) para **6 direcciones de CDMX/EdoMex**.
+1. Scrapea precio unitario, delivery fee, service fee, descuento y ETA de **5 productos estandarizados** en **3 plataformas** (Rappi, Uber Eats, DiDi Food) para **6 direcciones de CDMX/EdoMex**.
 2. Exporta el resultado a `data/scrapes.csv` y `data/scrapes.json`.
 3. Genera 3 gráficos demo-ready en un notebook que soportan los insights de la presentación.
 
@@ -57,17 +57,19 @@ Catálogo persistido en `data/addresses.csv` con columnas: `address_id, label, s
 
 ---
 
-## 4. Productos de referencia (3 SKUs)
+## 4. Productos de referencia (5 SKUs)
 
 | sku | nombre canónico | vertical | rationale |
 |---|---|---|---|
 | `big_mac` | Big Mac (unidad, sin combo) | Fast food | SKU global, fácil de identificar |
 | `mcombo_bigmac_med` | Combo Big Mac mediano (hamburguesa + papas + bebida) | Fast food | Combo medio, refleja ticket promedio |
+| `mcnuggets_10` | McNuggets 10 piezas | Fast food | Producto de share alto, sensible a promociones |
 | `cocacola_500ml` | Coca-Cola 500ml | Retail/Conveniencia | SKU universal, presente en restaurantes y tiendas |
+| `agua_1l` | Agua embotellada 1L | Retail/Conveniencia | Commodity puro: el spread entre plataformas evidencia markup |
 
-Persistido en `data/products.csv` con columnas: `sku, canonical_name, vertical, search_keywords` (string con sinónimos por plataforma para fuzzy matching del nombre raw).
+Persistido en `data/products.csv` con columnas: `sku, canonical_name, vertical, search_keywords, price_min_mxn, price_max_mxn` (keywords con sinónimos por plataforma para fuzzy matching del nombre raw).
 
-**Regla de matching:** primer item del menú cuyo `product_name_raw` contenga al menos una `search_keyword` Y el precio esté dentro de rango razonable (Big Mac 80-150 MXN, Combo 150-250 MXN, Coca 20-50 MXN). Si no hay match, `available=False`.
+**Regla de matching:** primer item del menú cuyo `product_name_raw` contenga al menos una `search_keyword` Y el precio esté dentro del rango `[price_min_mxn, price_max_mxn]`. Rangos actuales: Big Mac 80-150, Combo 150-250, Nuggets 10pz 60-150, Coca 500ml 20-50, Agua 1L 15-40. Si no hay match, `available=False`.
 
 ---
 
@@ -84,7 +86,7 @@ Persistido en `data/products.csv` con columnas: `sku, canonical_name, vertical, 
 | `address_label` | string | Denormalizado para conveniencia ("Polanco") |
 | `store_id` | string | ID interno de la plataforma |
 | `store_name` | string | Ej. "McDonald's Masaryk" |
-| `product_sku` | enum | `big_mac` \| `mcombo_bigmac_med` \| `cocacola_500ml` |
+| `product_sku` | enum | `big_mac` \| `mcombo_bigmac_med` \| `mcnuggets_10` \| `cocacola_500ml` \| `agua_1l` |
 | `product_name_raw` | string | Nombre tal cual aparece (auditoría de matching) |
 | `unit_price_mxn` | float | Precio del producto |
 | `delivery_fee_mxn` | float | Antes de descuentos |
@@ -148,9 +150,9 @@ competitive-intelligence/
 | Tramo | Tarea | Entregable | Checkpoint |
 |---|---|---|---|
 | H0:00–H0:30 | Setup: repo, deps, estructura, `addresses.csv` + `products.csv` hardcodeados, esqueleto `base.py` + `run.py` | Pipeline corre con scraper dummy que devuelve filas vacías | CSV vacío bien formado |
-| H0:30–H2:00 | **Rappi end-to-end**: 20 min captura DevTools, 30 min httpx, 20 min validar 6 direcciones, 20 min fallback Playwright si API falla | 18 filas reales (6 dirs × 3 productos) | `data/scrapes.csv` con 18 filas Rappi |
-| H2:00–H3:00 | **DiDi**: 15 min captura, 30 min implementación reusando scaffolding, 15 min validación | 36 filas acumuladas | CSV con 2 plataformas |
-| H3:00–H3:45 | **Uber Eats**: time-box estricto. Si API no cede a los 30 min → Playwright headless con solo 3 direcciones, documentar limitación en `blockers.md` | 54 filas (o 45 si Uber parcial) | CSV con 3 plataformas |
+| H0:30–H2:00 | **Rappi end-to-end**: 20 min captura DevTools, 30 min httpx, 20 min validar 6 direcciones, 20 min fallback Playwright si API falla | 30 filas reales (6 dirs × 5 productos) | `data/scrapes.csv` con 30 filas Rappi |
+| H2:00–H3:00 | **DiDi**: 15 min captura, 30 min implementación reusando scaffolding, 15 min validación | 60 filas acumuladas | CSV con 2 plataformas |
+| H3:00–H3:45 | **Uber Eats**: time-box estricto. Si API no cede a los 30 min → Playwright headless con solo 3 direcciones, documentar limitación en `blockers.md` | 90 filas (o 75 si Uber parcial) | CSV con 3 plataformas |
 | H3:45–H4:00 | **Notebook**: 3 gráficos hardcodeados | `insights.ipynb` ejecutable | Demo-ready |
 
 **Los 3 gráficos del notebook (fijos):**
@@ -184,7 +186,7 @@ competitive-intelligence/
 
 - Rate limiting: `asyncio.sleep(1.5)` entre requests por plataforma.
 - User-Agent realista (Chrome desktop reciente).
-- Sin volumen masivo: 6 direcciones × 3 productos × 3 plataformas = 54 requests totales en la corrida completa, comparable a un usuario humano explorando opciones.
+- Sin volumen masivo: el scraper hace 1 request de menú por (dirección × plataforma) = 18 requests; los 5 SKUs se extraen del mismo payload. Comparable a un usuario humano explorando opciones.
 - Datos públicamente accesibles desde la web logueada del usuario; no se accede a información privada de otros usuarios.
 - No se persisten credenciales en el repo (variables de entorno o `.env` gitignored).
 
@@ -207,7 +209,7 @@ competitive-intelligence/
 Al cierre de H4:00 debe existir:
 
 - [ ] `python -m scraper.run --platform all` ejecuta sin crashear.
-- [ ] `data/scrapes.csv` con al menos 36 filas reales (2 plataformas completas).
+- [ ] `data/scrapes.csv` con al menos 60 filas reales (2 plataformas completas, 5 SKUs × 6 dirs).
 - [ ] `data/scrapes.json` regenerado.
 - [ ] `notebooks/insights.ipynb` corre top-to-bottom y produce los 3 gráficos.
 - [ ] `docs/blockers.md` documenta cualquier limitación.

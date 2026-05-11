@@ -1,0 +1,7 @@
+address_id,label,street,lat,lng,zone_type
+1,Polanco,Av. Presidente Masaryk 201,19.4326,-99.1962,premium
+2,Roma Norte,Av. Alvaro Obregon 100,19.4194,-99.1610,trendy
+3,Del Valle,Av. Coyoacan 1000,19.3781,-99.1672,residencial
+4,Iztapalapa,Av. Ermita Iztapalapa 1000,19.3593,-99.0817,periferia
+5,Santa Fe,Av. Vasco de Quiroga 3800,19.3597,-99.2730,corporativo
+6,Cuautitlan Izcalli,Av. Jimenez Cantu,19.6469,-99.2058,edomex
