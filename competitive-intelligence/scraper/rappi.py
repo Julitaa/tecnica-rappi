@@ -39,7 +39,7 @@ from playwright.async_api import (
 
 from .base import PlatformScraper
 from .matching import MenuItem, match_product
-from .models import Address, Product, ScrapeRow
+from .models import Address, Brand, Product, ScrapeRow
 
 log = logging.getLogger("scraper.rappi")
 
@@ -50,11 +50,21 @@ PAGE_TIMEOUT_MS = 45_000
 STORE_URL_PATTERN = re.compile(r"/restaurantes/(\d+)-")
 
 
+_DEFAULT_BRAND = Brand(
+    brand_id="mcdonalds",
+    platform="rappi",
+    vertical="fast_food",
+    nav_strategy="brand_url",
+    nav_param=BRAND_MCDONALDS_URL,
+)
+
+
 class RappiScraper(PlatformScraper):
     name = "rappi"
-    nav_url = BRAND_MCDONALDS_URL
 
-    def __init__(self, headless: bool = True):
+    def __init__(self, brand: Brand | None = None, headless: bool = True):
+        self.brand = brand or _DEFAULT_BRAND
+        self.nav_url = self.brand.nav_param
         self.headless = headless
 
     async def scrape(
@@ -83,11 +93,16 @@ class RappiScraper(PlatformScraper):
 
         if storefront is None:
             return [
-                _empty_row(address, product, notes=notes or "rappi:no_store")
+                _empty_row(
+                    address,
+                    product,
+                    notes=notes or "rappi:no_store",
+                    brand_id=self.brand.brand_id,
+                )
                 for product in products
             ]
 
-        return _rows_from_storefront(storefront, address, products)
+        return _rows_from_storefront(storefront, address, products, self.brand.brand_id)
 
     async def _capture_storefront(
         self,
@@ -97,7 +112,7 @@ class RappiScraper(PlatformScraper):
         page = await ctx.new_page()
 
         try:
-            await page.goto(BRAND_MCDONALDS_URL, timeout=PAGE_TIMEOUT_MS)
+            await page.goto(self.brand.nav_param, timeout=PAGE_TIMEOUT_MS)
         except PWTimeout:
             return None, "rappi:brand_page_timeout"
 
@@ -181,7 +196,9 @@ class RappiScraper(PlatformScraper):
         return payload, None
 
 
-def _empty_row(address: Address, product: Product, notes: str) -> ScrapeRow:
+def _empty_row(
+    address: Address, product: Product, notes: str, brand_id: str
+) -> ScrapeRow:
     return ScrapeRow(
         platform="rappi",
         address_id=address.address_id,
@@ -190,6 +207,7 @@ def _empty_row(address: Address, product: Product, notes: str) -> ScrapeRow:
         collection_method="playwright",
         available=False,
         notes=notes,
+        brand_id=brand_id,
     )
 
 
@@ -243,6 +261,7 @@ def _rows_from_storefront(
     storefront: dict,
     address: Address,
     products: Sequence[Product],
+    brand_id: str,
 ) -> list[ScrapeRow]:
     jsonld = storefront["jsonld"]
     menu = _iter_menu_items(jsonld)
@@ -289,6 +308,7 @@ def _rows_from_storefront(
                     delivery_fee_mxn=delivery_fee_effective,
                     promo_text=promo,
                     notes="no_match_in_menu",
+                    brand_id=brand_id,
                 )
             )
             continue
@@ -315,6 +335,7 @@ def _rows_from_storefront(
                 eta_min_low=eta_value,
                 eta_min_high=eta_value,
                 promo_text=promo,
+                brand_id=brand_id,
             )
         )
     return rows
