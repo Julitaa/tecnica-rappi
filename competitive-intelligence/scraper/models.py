@@ -11,7 +11,19 @@ ProductSku = Literal[
     "mcnuggets_10",
     "cocacola_500ml",
     "agua_1l",
+    "panales_t4",
 ]
+
+NavStrategy = Literal["brand_url", "search_query"]
+
+
+@dataclass(frozen=True)
+class Brand:
+    brand_id: str
+    platform: Platform
+    vertical: str
+    nav_strategy: NavStrategy
+    nav_param: str
 
 
 @dataclass(frozen=True)
@@ -56,6 +68,7 @@ class ScrapeRow:
     eta_min_high: Optional[int] = None
     promo_text: Optional[str] = None
     notes: Optional[str] = None
+    brand_id: Optional[str] = None
     scrape_id: str = field(default_factory=lambda: str(uuid4()))
     timestamp_utc: str = field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
