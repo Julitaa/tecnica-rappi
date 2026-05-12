@@ -59,18 +59,22 @@ from playwright.async_api import (
 
 from .base import PlatformScraper
 from .matching import MenuItem, match_product
-from .models import Address, Product, ScrapeRow
+from .models import Address, Brand, Product, ScrapeRow
 
 log = logging.getLogger("scraper.ubereats")
 
 PAGE_TIMEOUT_MS = 45_000
 SEARCH_TIMEOUT_MS = 25_000
 STORE_TIMEOUT_MS = 30_000
-SEARCH_URL_TEMPLATE = "https://www.ubereats.com/mx/search?q=mcdonalds&pl={pl}"
-MCD_STORE_HREF_RE = re.compile(r"/mx/store/mcdonalds[a-z0-9\-]*/[A-Za-z0-9_\-]+")
-# Algunos resultados son "McDonald's Dummy ..." o postres-x-mcdonalds; queremos
-# el storefront principal: nombre empieza con "mcdonalds-" + sufijo simple.
-DUMMY_STORE_RE = re.compile(r"/store/mcdonalds-dummy", re.IGNORECASE)
+SEARCH_URL_TEMPLATE = "https://www.ubereats.com/mx/search?q={query}&pl={pl}"
+
+_DEFAULT_BRAND = Brand(
+    brand_id="mcdonalds",
+    platform="ubereats",
+    vertical="fast_food",
+    nav_strategy="search_query",
+    nav_param="mcdonalds",
+)
 
 
 def _build_pl(address: Address) -> str:
@@ -94,8 +98,11 @@ class UberEatsScraper(PlatformScraper):
     name = "ubereats"
     nav_url = "https://www.ubereats.com/mx"
 
-    def __init__(self, headless: bool = True):
+    def __init__(self, brand: Brand | None = None, headless: bool = True):
+        self.brand = brand or _DEFAULT_BRAND
         self.headless = headless
+        # Filtro de anchors: /store/<prefix>...
+        self._anchor_prefix = self.brand.nav_param.lower()
 
     async def scrape(
         self,
@@ -122,10 +129,15 @@ class UberEatsScraper(PlatformScraper):
 
         if captured is None:
             return [
-                _empty_row(address, product, notes=notes or "ubereats:no_store")
+                _empty_row(
+                    address,
+                    product,
+                    notes=notes or "ubereats:no_store",
+                    brand_id=self.brand.brand_id,
+                )
                 for product in products
             ]
-        return _rows_from_capture(captured, address, products)
+        return _rows_from_capture(captured, address, products, self.brand.brand_id)
 
     async def _capture(
         self,
@@ -133,7 +145,10 @@ class UberEatsScraper(PlatformScraper):
         address: Address,
     ) -> tuple[dict[str, Any] | None, str | None]:
         pl = _build_pl(address)
-        search_url = SEARCH_URL_TEMPLATE.format(pl=quote(pl, safe=""))
+        search_url = SEARCH_URL_TEMPLATE.format(
+            query=quote(self.brand.nav_param, safe=""),
+            pl=quote(pl, safe=""),
+        )
 
         page = await ctx.new_page()
         try:
@@ -146,53 +161,52 @@ class UberEatsScraper(PlatformScraper):
         # Esperar a que aparezca al menos un card de McDonald's no-dummy
         # cuyo subtree contenga también "<N> min" — eso garantiza que la
         # card terminó de hidratar con su ETA.
+        prefix = self._anchor_prefix
         try:
             await page.wait_for_function(
-                """() => {
-                    const anchors = [...document.querySelectorAll('a[href*=\"/store/mcdonalds\"]')];
-                    for (const a of anchors) {
-                        if (/\\/store\\/mcdonalds-dummy/i.test(a.href)) continue;
+                f"""() => {{
+                    const anchors = [...document.querySelectorAll('a[href*=\"/store/{prefix}\"]')];
+                    for (const a of anchors) {{
+                        if (/\\/store\\/{prefix}-dummy/i.test(a.href)) continue;
                         let node = a.parentElement;
-                        for (let i = 0; i < 15 && node; i++) {
+                        for (let i = 0; i < 15 && node; i++) {{
                             const t = node.innerText || '';
-                            if (/\\d+\\s*min/.test(t) && /McDonald/i.test(t)) return true;
+                            if (/\\d+\\s*min/.test(t)) return true;
                             node = node.parentElement;
-                        }
-                    }
+                        }}
+                    }}
                     return false;
-                }""",
+                }}""",
                 timeout=SEARCH_TIMEOUT_MS,
             )
         except PWTimeout:
             return None, "ubereats:no_search_results"
 
         first = await page.evaluate(
-            """() => {
-                const anchors = [...document.querySelectorAll('a[href*=\"/store/mcdonalds\"]')];
+            f"""() => {{
+                const anchors = [...document.querySelectorAll('a[href*=\"/store/{prefix}\"]')];
                 const seen = new Set();
-                for (const a of anchors) {
-                    if (/\\/store\\/mcdonalds-dummy/i.test(a.href)) continue;
+                for (const a of anchors) {{
+                    if (/\\/store\\/{prefix}-dummy/i.test(a.href)) continue;
                     const base = a.href.split('?')[0];
                     if (seen.has(base)) continue;
                     seen.add(base);
-                    // Caminar para arriba hasta encontrar un ancestro cuyo
-                    // subtree contenga "<N> min" — ese es el card.
                     let node = a.parentElement;
                     let eta = null;
-                    for (let i = 0; i < 15 && node; i++) {
+                    for (let i = 0; i < 15 && node; i++) {{
                         const t = node.innerText || '';
                         const m = t.match(/(\\d+)\\s*min/);
-                        if (m) { eta = parseInt(m[1], 10); break; }
+                        if (m) {{ eta = parseInt(m[1], 10); break; }}
                         node = node.parentElement;
-                    }
+                    }}
                     const name = (a.innerText || '').split('\\n')[0].trim();
-                    return {storeUrl: base, eta, name};
-                }
+                    return {{storeUrl: base, eta, name}};
+                }}
                 return null;
-            }"""
+            }}"""
         )
         if not first or not first.get("storeUrl"):
-            return None, "ubereats:no_mcdonalds_in_search"
+            return None, f"ubereats:no_results_for_{self._anchor_prefix}"
 
         store_url = f"{first['storeUrl']}?pl={quote(pl, safe='')}"
         try:
@@ -209,7 +223,8 @@ class UberEatsScraper(PlatformScraper):
                     for (const s of ss) {
                         try {
                             const j = JSON.parse(s.textContent);
-                            if (j && j['@type'] === 'Restaurant' && j.hasMenu) return true;
+                            const t = j && j['@type'];
+                            if (t && /Restaurant|GroceryStore|Store/.test(t) && j.hasMenu) return true;
                         } catch (e) {}
                     }
                     return false;
@@ -226,7 +241,8 @@ class UberEatsScraper(PlatformScraper):
                 for (const s of ss) {
                     try {
                         const j = JSON.parse(s.textContent);
-                        if (j && j['@type'] === 'Restaurant') { restaurant = j; break; }
+                        const t = j && j['@type'];
+                        if (t && /Restaurant|GroceryStore|Store/.test(t)) { restaurant = j; break; }
                     } catch (e) {}
                 }
                 if (!restaurant) return null;
@@ -278,7 +294,9 @@ class UberEatsScraper(PlatformScraper):
         return payload, None
 
 
-def _empty_row(address: Address, product: Product, notes: str) -> ScrapeRow:
+def _empty_row(
+    address: Address, product: Product, notes: str, brand_id: str
+) -> ScrapeRow:
     return ScrapeRow(
         platform="ubereats",
         address_id=address.address_id,
@@ -287,6 +305,7 @@ def _empty_row(address: Address, product: Product, notes: str) -> ScrapeRow:
         collection_method="playwright",
         available=False,
         notes=notes,
+        brand_id=brand_id,
     )
 
 
@@ -333,6 +352,7 @@ def _rows_from_capture(
     captured: dict,
     address: Address,
     products: Sequence[Product],
+    brand_id: str,
 ) -> list[ScrapeRow]:
     restaurant = captured["restaurant"]
     menu = _iter_menu_items(restaurant)
@@ -377,6 +397,7 @@ def _rows_from_capture(
                     delivery_fee_mxn=delivery_fee_effective,
                     promo_text=promo,
                     notes="no_match_in_menu",
+                    brand_id=brand_id,
                 )
             )
             continue
@@ -403,6 +424,7 @@ def _rows_from_capture(
                 eta_min_low=eta_value,
                 eta_min_high=eta_value,
                 promo_text=promo,
+                brand_id=brand_id,
             )
         )
     return rows
