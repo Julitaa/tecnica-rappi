@@ -78,3 +78,84 @@ def test_aggregate_by_country(toolbox):
     )
     countries = {row["country"] for row in result["data"]}
     assert countries == {"CO", "MX"}
+
+
+def test_multivariable_filter(toolbox):
+    import pandas as pd
+    from app.data.repository import Repository
+    from app.chat.toolbox import Toolbox
+    rows = []
+    for country in ["CO"]:
+        for zn in range(4):
+            for metric, base in [("Lead Penetration", 0.1 * (zn + 1)),
+                                  ("Perfect Orders", 0.9 - 0.1 * zn)]:
+                for w in range(9):
+                    rows.append({
+                        "country": country, "city": "X", "zone": f"z{zn}",
+                        "zone_type": "Wealthy", "zone_prioritization": "Prioritized",
+                        "metric": metric, "week_offset": w,
+                        "value": base,
+                    })
+    repo = Repository(pd.DataFrame(rows), pd.DataFrame())
+    tb = Toolbox(repo)
+    result = tb.multivariable_filter(conditions=[
+        {"metric": "Lead Penetration", "op": ">", "value": 0.2},
+        {"metric": "Perfect Orders", "op": "<", "value": 0.85},
+    ])
+    zones = {row["zone"] for row in result["data"]}
+    assert "z0" not in zones  # LP=0.1, fails first condition
+    assert "z3" in zones      # LP=0.4>0.2 and PO=0.6<0.85
+
+
+def test_correlate_metrics(toolbox):
+    import pandas as pd
+    from app.data.repository import Repository
+    from app.chat.toolbox import Toolbox
+    rows = []
+    for zn in range(20):
+        lp = 0.1 + 0.04 * zn
+        po = 0.9 - 0.03 * zn
+        for w in range(9):
+            for metric, val in [("Lead Penetration", lp), ("Perfect Orders", po)]:
+                rows.append({
+                    "country": "CO", "city": "X", "zone": f"z{zn}",
+                    "zone_type": "Wealthy", "zone_prioritization": "P",
+                    "metric": metric, "week_offset": w, "value": val,
+                })
+    repo = Repository(pd.DataFrame(rows), pd.DataFrame())
+    tb = Toolbox(repo)
+    result = tb.correlate_metrics(
+        metric_a="Lead Penetration", metric_b="Perfect Orders",
+    )
+    assert result["data"]["correlation"] < -0.9
+    assert result["data"]["n"] == 20
+
+
+def test_growth_explainer_returns_top_growing_zones():
+    import pandas as pd
+    from app.data.repository import Repository
+    from app.chat.toolbox import Toolbox
+    rows = []
+    for zn in range(5):
+        for w in range(9):
+            growth = zn * 50 * ((8 - w) / 8)
+            rows.append({
+                "country": "CO", "city": "X", "zone": f"z{zn}",
+                "metric": "Orders", "week_offset": w,
+                "value": 100 + growth,
+            })
+        for w in range(9):
+            rows.append({
+                "country": "CO", "city": "X", "zone": f"z{zn}",
+                "zone_type": "Wealthy", "zone_prioritization": "P",
+                "metric": "Lead Penetration", "week_offset": w,
+                "value": 0.5 + 0.05 * zn,
+            })
+    metrics = pd.DataFrame([r for r in rows if r["metric"] != "Orders"])
+    orders = pd.DataFrame([r for r in rows if r["metric"] == "Orders"])
+    repo = Repository(metrics, orders)
+    tb = Toolbox(repo)
+    result = tb.growth_explainer(weeks=5, top_n=3)
+    top_zones = [row["zone"] for row in result["data"]["top_growth"]]
+    assert top_zones[0] == "z4"
+    assert "correlated_metrics" in result["data"]
