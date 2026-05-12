@@ -10,6 +10,7 @@ from .models import Address, Product, ScrapeRow
 
 class UberEatsScraper(PlatformScraper):
     name = "ubereats"
+    nav_url = "https://www.ubereats.com/mx"
 
     async def scrape(
         self,

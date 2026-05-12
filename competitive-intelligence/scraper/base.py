@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Sequence
 
 from .models import Address, Product, ScrapeRow
+from .robots import RobotsResult, check_url
 
 
 class PlatformScraper(ABC):
@@ -12,6 +13,11 @@ class PlatformScraper(ABC):
     """
 
     name: str
+    # URL pública que el browser navegará. Se usa para chequear robots.txt.
+    nav_url: str = ""
+
+    def check_robots(self) -> RobotsResult:
+        return check_url(self.nav_url)
 
     @abstractmethod
     async def scrape(

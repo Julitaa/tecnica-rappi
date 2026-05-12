@@ -63,6 +63,16 @@ async def _run_one(
     addresses: list[Address],
     products: list[Product],
 ) -> list[ScrapeRow]:
+    robots = scraper.check_robots()
+    fetched = "ok" if robots.fetched else "ausente/404"
+    if not robots.allowed:
+        print(
+            f"SKIP {scraper.name}: robots.txt ({fetched}) prohibe {robots.url}. "
+            f"Ver {robots.robots_url}."
+        )
+        return []
+    print(f"OK robots {scraper.name}: {robots.url} permitido ({fetched}).")
+
     rows: list[ScrapeRow] = []
     for address in addresses:
         rows.extend(await scraper.scrape(address, products))
