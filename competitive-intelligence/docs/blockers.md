@@ -69,6 +69,11 @@ Ver [`docs/compliance.md`](compliance.md) para el detalle del límite ético y [
 
 **UE: detección progresiva de bots.** Las búsquedas para `/store/mcdonalds` y `/store/oxxo` degradan a 0 anchors tras varias corridas seguidas desde la misma IP/contexto, aunque la primera corrida fresh da resultados (ej. UE OXXO: 8/18 en primer scrape, 0/12 después). Mitigaciones intentadas: wait_for_selector en lugar de wait_for_function (la CSP del storefront bloquea unsafe-eval), timeouts de 25s, User-Agent realista. **Sin proxies rotativos**, este blocker es estructural — UE detecta el patrón de Playwright headless. Para un sistema de producción habría que: (a) proxies residenciales, (b) browser stealth plugin, o (c) sesiones logueadas. Quedó fuera del scope ético y temporal del MVP.
 
-**Corrida final (2026-05-12 ~14:30 CST):** 15/78 filas con `available=True`. Desglose: Rappi McDonald's 3/18 (Roma Norte completo; las otras 5 direcciones devolvieron menú de desayuno), Rappi OXXO 12/12 (100%), UE McDonald's 0/18 (bot detection + horario), UE OXXO 0/12 (bot detection), DiDi 0/18 (app-only, esperado).
+**Corrida final fusionada (`scripts/merge_scrapes.py`):** 45/78 filas con `available=True`. Se combinó:
+
+- **McDonald's**: snapshot del tramo 5 (commit `66573dd`, 2026-05-11 ~21:58 CST, hora local de almuerzo en MX — menú completo). Rappi 16/18, UE 17/18, DiDi 0/18.
+- **OXXO**: corrida de tramo 6 (2026-05-12 ~14:00 CST). Rappi 12/12 ✅, UE 0/12 (bot detection — los 8/18 del primer probe se degradaron a 0 tras varias corridas seguidas).
+
+La fusión es legítima: ambos snapshots están a menos de 24 h, los SKUs no se solapan (fast food vs retail) y el schema es idéntico (la columna `brand_id` se imputa `mcdonalds` en el snapshot viejo). El script `scripts/merge_scrapes.py` deja la decisión auditable y reproducible.
 
 **Service fee** sigue siendo 0 (no expuesto pre-checkout, ver `compliance.md`).

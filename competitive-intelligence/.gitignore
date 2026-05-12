@@ -8,3 +8,4 @@ venv/
 probe_output/
 scripts/*
 !scripts/build_notebook.py
+!scripts/merge_scrapes.py
