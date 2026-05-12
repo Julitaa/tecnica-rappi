@@ -27,18 +27,27 @@ from __future__ import annotations
 from typing import Sequence
 
 from .base import PlatformScraper
-from .models import Address, Product, ScrapeRow
+from .models import Address, Brand, Product, ScrapeRow
 from .robots import RobotsResult
 
 UNAVAILABILITY_NOTE = "didi_mx_no_public_web_surface_app_only"
 
+_DEFAULT_BRAND = Brand(
+    brand_id="mcdonalds",
+    platform="didi",
+    vertical="fast_food",
+    nav_strategy="brand_url",
+    nav_param="https://www.didi-food.com/es-MX/food/",
+)
+
 
 class DidiScraper(PlatformScraper):
     name = "didi"
-    # URL marketing — la única superficie pública existente. La declaramos por
-    # honestidad (sería el único punto en el que un crawler tocaría DiDi), pero
-    # `scrape()` no abre Playwright porque no hay nada que extraer.
     nav_url = "https://www.didi-food.com/es-MX/food/"
+
+    def __init__(self, brand: Brand | None = None, headless: bool = True) -> None:
+        self.brand = brand or _DEFAULT_BRAND
+        self.headless = headless
 
     def check_robots(self) -> RobotsResult:
         # Short-circuit: no existe robots.txt en didi-food.com y la URL marketing
@@ -65,6 +74,7 @@ class DidiScraper(PlatformScraper):
                 collection_method="playwright",
                 available=False,
                 notes=UNAVAILABILITY_NOTE,
+                brand_id=self.brand.brand_id,
             )
             for product in products
         ]

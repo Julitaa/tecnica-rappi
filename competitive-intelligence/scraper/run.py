@@ -13,9 +13,9 @@ from dataclasses import asdict
 from pathlib import Path
 
 from .base import PlatformScraper
-from .catalog import DATA_DIR, load_addresses, load_products
+from .catalog import DATA_DIR, load_addresses, load_brands, load_products
 from .didi import DidiScraper
-from .models import Address, Product, ScrapeRow
+from .models import Address, Brand, Product, ScrapeRow
 from .rappi import RappiScraper
 from .ubereats import UberEatsScraper
 
@@ -47,15 +47,35 @@ CSV_COLUMNS = [
     "promo_text",
     "collection_method",
     "notes",
+    "brand_id",
 ]
 
 
-def _select_scrapers(platform: str) -> list[PlatformScraper]:
-    if platform == "all":
-        return [cls() for cls in SCRAPERS.values()]
-    if platform not in SCRAPERS:
+def _build_scrapers(
+    platform: str, brand_filter: str | None
+) -> list[PlatformScraper]:
+    brands = load_brands()
+    # DiDi no está en brands.csv (es app-only). Lo incluimos solo si
+    # el target es fast_food y la plataforma lo pide.
+    if platform != "all" and platform not in SCRAPERS:
         raise SystemExit(f"plataforma desconocida: {platform}")
-    return [SCRAPERS[platform]()]
+    if platform != "all":
+        brands = [b for b in brands if b.platform == platform]
+    if brand_filter:
+        brands = [b for b in brands if b.brand_id == brand_filter]
+
+    out: list[PlatformScraper] = []
+    for b in brands:
+        cls = SCRAPERS.get(b.platform)
+        if cls is None:
+            continue
+        out.append(cls(brand=b))
+
+    # DiDi: una sola instancia con default brand si platform=all/didi y
+    # no se filtró por una brand específica que no sea mcdonalds.
+    if (platform in ("all", "didi")) and (brand_filter in (None, "mcdonalds")):
+        out.append(DidiScraper())
+    return out
 
 
 async def _run_one(
@@ -63,27 +83,34 @@ async def _run_one(
     addresses: list[Address],
     products: list[Product],
 ) -> list[ScrapeRow]:
+    brand_id = getattr(scraper, "brand", None)
+    brand_label = brand_id.brand_id if brand_id else "?"
     robots = scraper.check_robots()
     fetched = "ok" if robots.fetched else "ausente/404"
     if not robots.allowed:
         print(
-            f"SKIP {scraper.name}: robots.txt ({fetched}) prohibe {robots.url}. "
-            f"Ver {robots.robots_url}."
+            f"SKIP {scraper.name}/{brand_label}: robots.txt ({fetched}) "
+            f"prohibe {robots.url}. Ver {robots.robots_url}."
         )
         return []
-    print(f"OK robots {scraper.name}: {robots.url} permitido ({fetched}).")
+    print(
+        f"OK robots {scraper.name}/{brand_label}: {robots.url} "
+        f"permitido ({fetched})."
+    )
 
+    vertical = scraper.brand.vertical
+    products_for_brand = [p for p in products if p.vertical == vertical]
     rows: list[ScrapeRow] = []
     for address in addresses:
-        rows.extend(await scraper.scrape(address, products))
+        rows.extend(await scraper.scrape(address, products_for_brand))
         await asyncio.sleep(1.5)  # rate-limit defensivo (ver spec §9)
     return rows
 
 
-async def _run(platform: str) -> list[ScrapeRow]:
+async def _run(platform: str, brand_filter: str | None) -> list[ScrapeRow]:
     addresses = load_addresses()
     products = load_products()
-    scrapers = _select_scrapers(platform)
+    scrapers = _build_scrapers(platform, brand_filter)
     results = await asyncio.gather(
         *(_run_one(s, addresses, products) for s in scrapers)
     )
@@ -113,6 +140,11 @@ def main() -> None:
         default="all",
     )
     parser.add_argument(
+        "--brand",
+        default=None,
+        help="Filtrar a un brand_id (ej. mcdonalds, walmart_super)",
+    )
+    parser.add_argument(
         "--out-dir",
         type=Path,
         default=DATA_DIR,
@@ -120,7 +152,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    rows = asyncio.run(_run(args.platform))
+    rows = asyncio.run(_run(args.platform, args.brand))
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     _write_csv(rows, args.out_dir / "scrapes.csv")
