@@ -1,0 +1,32 @@
+[project]
+name = "operations-analyzer-backend"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pandas>=2.2",
+    "openpyxl>=3.1",
+    "pyarrow>=18.0",
+    "duckdb>=1.1",
+    "sqlglot>=25.0",
+    "openai>=1.54",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "python-dotenv>=1.0",
+    "markdown>=3.7",
+    "weasyprint>=63.0",
+    "sse-starlette>=2.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.27",
+    "ruff>=0.7",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+asyncio_mode = "auto"
