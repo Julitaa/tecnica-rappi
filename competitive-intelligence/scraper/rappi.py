@@ -45,7 +45,8 @@ log = logging.getLogger("scraper.rappi")
 
 BRAND_MCDONALDS_URL = "https://www.rappi.com.mx/restaurantes/delivery/706-mcdonald-s"
 USE_LOCATION_TEXT = "Usa tu ubicación actual"
-PAGE_TIMEOUT_MS = 45_000
+PAGE_TIMEOUT_MS = 30_000
+STOREFRONT_TIMEOUT_MS = 25_000
 # URL final tras redirect: /restaurantes/<store_id>-<slug>
 STORE_URL_PATTERN = re.compile(r"/restaurantes/(\d+)-")
 
@@ -72,6 +73,7 @@ class RappiScraper(PlatformScraper):
         address: Address,
         products: Sequence[Product],
     ) -> list[ScrapeRow]:
+        log.info("[%s/%s] inicio", self.brand.brand_id, address.label)
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=self.headless)
             try:
@@ -102,6 +104,7 @@ class RappiScraper(PlatformScraper):
                 for product in products
             ]
 
+        storefront["brand_id_for_log"] = self.brand.brand_id
         return _rows_from_storefront(storefront, address, products, self.brand.brand_id)
 
     async def _capture_storefront(
@@ -116,31 +119,57 @@ class RappiScraper(PlatformScraper):
         except PWTimeout:
             return None, "rappi:brand_page_timeout"
 
+        # Modal address_capture: aparece en brand pages de restaurantes
+        # (McDonald's) pero NO en URLs de tiendas concretas (ej. OXXO Express),
+        # donde la página ya carga directo el storefront usando geolocation.
+        modal_present = False
         try:
             await page.wait_for_selector(
-                '[data-testid="address_capture"]', timeout=15_000
+                '[data-testid="address_capture"]', timeout=8_000
             )
+            modal_present = True
         except PWTimeout:
             log.info("[%s] sin modal address_capture", address.label)
 
-        try:
-            await page.get_by_text(USE_LOCATION_TEXT, exact=False).click(timeout=8_000)
-        except PWTimeout:
-            return None, "rappi:use_location_button_missing"
+        if modal_present:
+            try:
+                await page.get_by_text(USE_LOCATION_TEXT, exact=False).click(
+                    timeout=8_000
+                )
+            except PWTimeout:
+                return None, "rappi:use_location_button_missing"
 
-        # Esperar a que el storefront cargue el JSON-LD del menú.
+        # Esperar JSON-LD del menú. Restaurantes usan `seo-structured-schema`
+        # con `hasMenu`; tiendas (retail) usan múltiples `<script type=ld+json>`
+        # con `@type=ItemList → itemListElement[].item (Product)`.
+        is_retail = self.brand.vertical == "retail"
         try:
-            await page.wait_for_function(
-                """() => {
-                    const el = document.getElementById('seo-structured-schema');
-                    if (!el) return false;
-                    try {
-                        const j = JSON.parse(el.textContent);
-                        return !!(j && j.hasMenu && j.hasMenu.hasMenuSection);
-                    } catch { return false; }
-                }""",
-                timeout=25_000,
-            )
+            if is_retail:
+                await page.wait_for_function(
+                    """() => {
+                        const lds = document.querySelectorAll('script[type=\"application/ld+json\"]');
+                        for (const s of lds) {
+                            try {
+                                const j = JSON.parse(s.textContent);
+                                if (j && j['@type'] === 'ItemList' && Array.isArray(j.itemListElement) && j.itemListElement.length) return true;
+                            } catch {}
+                        }
+                        return false;
+                    }""",
+                    timeout=STOREFRONT_TIMEOUT_MS,
+                )
+            else:
+                await page.wait_for_function(
+                    """() => {
+                        const el = document.getElementById('seo-structured-schema');
+                        if (!el) return false;
+                        try {
+                            const j = JSON.parse(el.textContent);
+                            return !!(j && j.hasMenu && j.hasMenu.hasMenuSection);
+                        } catch { return false; }
+                    }""",
+                    timeout=STOREFRONT_TIMEOUT_MS,
+                )
         except PWTimeout:
             return None, "rappi:storefront_timeout"
 
@@ -150,6 +179,20 @@ class RappiScraper(PlatformScraper):
                 """() => {
                     const ldEl = document.getElementById('seo-structured-schema');
                     const ld = ldEl ? JSON.parse(ldEl.textContent) : null;
+
+                    // Retail (tiendas): juntar todos los ItemList JSON-LD.
+                    const itemLists = [];
+                    let storeFromLd = null;
+                    for (const s of document.querySelectorAll('script[type="application/ld+json"]')) {
+                        try {
+                            const j = JSON.parse(s.textContent);
+                            if (j && j['@type'] === 'ItemList' && Array.isArray(j.itemListElement)) {
+                                itemLists.push(j);
+                            } else if (j && j['@type'] === 'Store' && !storeFromLd) {
+                                storeFromLd = j;
+                            }
+                        } catch {}
+                    }
 
                     // ETA: buscar primer span corto con "<n> min" (textContent porque
                     // innerText puede ser vacío hasta layout pintado)
@@ -181,6 +224,8 @@ class RappiScraper(PlatformScraper):
                     return {
                         url: window.location.href,
                         jsonld: ld,
+                        item_lists: itemLists,
+                        store_ld: storeFromLd,
                         eta_min: eta,
                         free_shipping: freeShipping,
                         promo_text: promoBits.join(' | ') || null,
@@ -190,9 +235,16 @@ class RappiScraper(PlatformScraper):
         except Exception as e:
             return None, f"rappi:dom_extract_failed:{e.__class__.__name__}"
 
-        if not payload or not payload.get("jsonld"):
-            return None, "rappi:jsonld_missing"
-
+        if not payload:
+            return None, "rappi:dom_extract_empty"
+        # Marcar de qué fuente sacar el menú.
+        payload["is_retail"] = is_retail
+        if is_retail:
+            if not payload.get("item_lists"):
+                return None, "rappi:item_list_missing"
+        else:
+            if not payload.get("jsonld"):
+                return None, "rappi:jsonld_missing"
         return payload, None
 
 
@@ -247,6 +299,39 @@ def _iter_menu_items(jsonld: dict) -> list[MenuItem]:
     return items
 
 
+def _iter_item_list_items(item_lists: list[dict]) -> list[MenuItem]:
+    """Aplana ItemList[].itemListElement[].item (Product → offers.price).
+
+    Estructura observada en Rappi tiendas (OXXO Express, etc.):
+      ItemList { itemListElement: [ ListItem { item: Product { name, offers: { price } } } ] }
+    Cada categoría visible en el storefront emite su propio ItemList script.
+    """
+    items: list[MenuItem] = []
+    seen: set[tuple[str, float]] = set()
+    for il in item_lists or []:
+        for elem in il.get("itemListElement") or []:
+            if not isinstance(elem, dict):
+                continue
+            prod = elem.get("item") or {}
+            if not isinstance(prod, dict):
+                continue
+            name = prod.get("name") or ""
+            offers = prod.get("offers") or {}
+            price = offers.get("price") if isinstance(offers, dict) else None
+            if not name or price is None:
+                continue
+            try:
+                price_f = float(price)
+            except (TypeError, ValueError):
+                continue
+            key = (name, price_f)
+            if key in seen:
+                continue
+            seen.add(key)
+            items.append(MenuItem(name_raw=name, unit_price_mxn=price_f))
+    return items
+
+
 def _store_id_from_url(url: str) -> str | None:
     m = STORE_URL_PATTERN.search(url or "")
     return m.group(1) if m else None
@@ -263,12 +348,28 @@ def _rows_from_storefront(
     products: Sequence[Product],
     brand_id: str,
 ) -> list[ScrapeRow]:
-    jsonld = storefront["jsonld"]
-    menu = _iter_menu_items(jsonld)
+    jsonld = storefront.get("jsonld") or {}
+    item_lists = storefront.get("item_lists") or []
+    store_ld = storefront.get("store_ld") or {}
+    is_retail = bool(storefront.get("is_retail"))
+
+    # Restaurantes: jsonld.hasMenu. Tiendas (retail): lista de ItemList.
+    # No mezclar — los ItemList de SEO en páginas de restaurantes contienen
+    # carruseles featured que ensucian el matching.
+    if is_retail:
+        menu = _iter_item_list_items(item_lists)
+    else:
+        menu = _iter_menu_items(jsonld) if jsonld else []
+    log.info(
+        "[%s/%s] menu items extraídos: %d",
+        storefront.get("brand_id_for_log", "?"),
+        address.label,
+        len(menu),
+    )
+
     eta_value = storefront.get("eta_min")
-    delivery_fee = _delivery_fee(jsonld)
+    delivery_fee = _delivery_fee(jsonld) if jsonld else 0.0
     has_free_shipping = bool(storefront.get("free_shipping"))
-    # Si el banner muestra "Envío Gratis", el delivery_fee efectivo es 0.
     if has_free_shipping:
         delivery_fee_effective = delivery_fee
         discount = round(-delivery_fee, 2)
@@ -279,8 +380,9 @@ def _rows_from_storefront(
     service_fee = 0.0  # no expuesto fuera del checkout (ver compliance.md)
     promo = storefront.get("promo_text")
     store_id = _store_id_from_url(storefront.get("url") or "")
-    store_name_jsonld = jsonld.get("name") or ""
-    address_node = jsonld.get("address") or {}
+    name_source = jsonld if jsonld.get("name") else store_ld
+    store_name_jsonld = (name_source.get("name") if isinstance(name_source, dict) else "") or ""
+    address_node = (name_source.get("address") if isinstance(name_source, dict) else {}) or {}
     street = address_node.get("streetAddress") if isinstance(address_node, dict) else ""
     store_name = (
         f"{store_name_jsonld} - {street.split(',')[0]}".strip(" -")

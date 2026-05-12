@@ -63,9 +63,9 @@ from .models import Address, Brand, Product, ScrapeRow
 
 log = logging.getLogger("scraper.ubereats")
 
-PAGE_TIMEOUT_MS = 45_000
+PAGE_TIMEOUT_MS = 30_000
 SEARCH_TIMEOUT_MS = 25_000
-STORE_TIMEOUT_MS = 30_000
+STORE_TIMEOUT_MS = 20_000
 SEARCH_URL_TEMPLATE = "https://www.ubereats.com/mx/search?q={query}&pl={pl}"
 
 _DEFAULT_BRAND = Brand(
@@ -109,6 +109,7 @@ class UberEatsScraper(PlatformScraper):
         address: Address,
         products: Sequence[Product],
     ) -> list[ScrapeRow]:
+        log.info("[%s/%s] inicio", self.brand.brand_id, address.label)
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=self.headless)
             try:
@@ -158,29 +159,18 @@ class UberEatsScraper(PlatformScraper):
         except PWTimeout:
             return None, "ubereats:search_timeout"
 
-        # Esperar a que aparezca al menos un card de McDonald's no-dummy
-        # cuyo subtree contenga también "<N> min" — eso garantiza que la
-        # card terminó de hidratar con su ETA.
+        # CSP en algunas storefront pages de UE bloquea wait_for_function
+        # (unsafe-eval). Usamos wait_for_selector para esperar el anchor del
+        # brand objetivo + un sleep para dar tiempo a hidratar el ETA. Filtra
+        # dummies por sufijo en el regex de extracción posterior.
         prefix = self._anchor_prefix
         try:
-            await page.wait_for_function(
-                f"""() => {{
-                    const anchors = [...document.querySelectorAll('a[href*=\"/store/{prefix}\"]')];
-                    for (const a of anchors) {{
-                        if (/\\/store\\/{prefix}-dummy/i.test(a.href)) continue;
-                        let node = a.parentElement;
-                        for (let i = 0; i < 15 && node; i++) {{
-                            const t = node.innerText || '';
-                            if (/\\d+\\s*min/.test(t)) return true;
-                            node = node.parentElement;
-                        }}
-                    }}
-                    return false;
-                }}""",
-                timeout=SEARCH_TIMEOUT_MS,
+            await page.wait_for_selector(
+                f'a[href*="/store/{prefix}"]', timeout=SEARCH_TIMEOUT_MS
             )
         except PWTimeout:
-            return None, "ubereats:no_search_results"
+            return None, f"ubereats:no_results_for_{prefix}"
+        await page.wait_for_timeout(5000)
 
         first = await page.evaluate(
             f"""() => {{
@@ -216,23 +206,31 @@ class UberEatsScraper(PlatformScraper):
         except PWTimeout:
             return None, "ubereats:store_timeout"
 
-        try:
-            await page.wait_for_function(
-                """() => {
-                    const ss = document.querySelectorAll('script[type=\"application/ld+json\"]');
-                    for (const s of ss) {
-                        try {
-                            const j = JSON.parse(s.textContent);
-                            const t = j && j['@type'];
-                            if (t && /Restaurant|GroceryStore|Store/.test(t) && j.hasMenu) return true;
-                        } catch (e) {}
-                    }
-                    return false;
-                }""",
-                timeout=STORE_TIMEOUT_MS,
-            )
-        except PWTimeout:
-            return None, "ubereats:no_jsonld_menu"
+        # Restaurantes exponen hasMenu; tiendas (OXXO) NO. La CSP de las
+        # storefront pages de tiendas bloquea wait_for_function (unsafe-eval),
+        # así que para retail simplemente esperamos un tiempo fijo y validamos
+        # después en _rows_from_capture si hay productos.
+        is_retail = self.brand.vertical == "retail"
+        if is_retail:
+            await page.wait_for_timeout(5000)
+        else:
+            try:
+                await page.wait_for_function(
+                    """() => {
+                        const ss = document.querySelectorAll('script[type=\"application/ld+json\"]');
+                        for (const s of ss) {
+                            try {
+                                const j = JSON.parse(s.textContent);
+                                const t = j && j['@type'];
+                                if (t && /Restaurant|GroceryStore|Store/.test(t) && j.hasMenu) return true;
+                            } catch (e) {}
+                        }
+                        return false;
+                    }""",
+                    timeout=STORE_TIMEOUT_MS,
+                )
+            except PWTimeout:
+                return None, "ubereats:no_jsonld_menu"
 
         payload = await page.evaluate(
             """() => {
@@ -245,7 +243,26 @@ class UberEatsScraper(PlatformScraper):
                         if (t && /Restaurant|GroceryStore|Store/.test(t)) { restaurant = j; break; }
                     } catch (e) {}
                 }
-                if (!restaurant) return null;
+                // Retail: tiendas tipo OXXO no exponen hasMenu. Parseamos
+                // pares "$<precio>\\n<nombre>" del innerText como fallback.
+                const innerProducts = [];
+                {
+                    const body = document.body.innerText || '';
+                    const lines = body.split('\\n');
+                    const seen = new Set();
+                    for (let i = 0; i < lines.length - 1; i++) {
+                        const m = lines[i].match(/^\\$\\s*([0-9]+(?:\\.[0-9]+)?)\\s*$/);
+                        if (!m) continue;
+                        const price = parseFloat(m[1]);
+                        const name = (lines[i+1] || '').trim();
+                        if (!name || name.length > 150 || /^\\$/.test(name)) continue;
+                        const key = name.toLowerCase() + '|' + price;
+                        if (seen.has(key)) continue;
+                        seen.add(key);
+                        innerProducts.push({name, price});
+                        if (innerProducts.length >= 600) break;
+                    }
+                }
 
                 // Delivery fee + promo del body
                 const body = document.body.innerText || '';
@@ -278,6 +295,7 @@ class UberEatsScraper(PlatformScraper):
                 return {
                     url: location.href,
                     restaurant,
+                    innerProducts,
                     deliveryFeeRaw,
                     deliveryFreeWithUberOne,
                     deliveryFreeUnconditional,
@@ -287,6 +305,8 @@ class UberEatsScraper(PlatformScraper):
         )
         if not payload:
             return None, "ubereats:dom_extract_failed"
+        if not payload.get("restaurant") and not payload.get("innerProducts"):
+            return None, "ubereats:no_menu_or_products"
 
         # ETA viene del search card; inyectamos
         payload["eta_min"] = first.get("eta")
@@ -354,14 +374,26 @@ def _rows_from_capture(
     products: Sequence[Product],
     brand_id: str,
 ) -> list[ScrapeRow]:
-    restaurant = captured["restaurant"]
-    menu = _iter_menu_items(restaurant)
+    restaurant = captured.get("restaurant") or {}
+    menu = _iter_menu_items(restaurant) if restaurant else []
+    # Fallback retail: innerProducts del DOM (pares $precio\nname).
+    if not menu:
+        for p in captured.get("innerProducts") or []:
+            try:
+                menu.append(
+                    MenuItem(name_raw=p["name"], unit_price_mxn=float(p["price"]))
+                )
+            except (KeyError, TypeError, ValueError):
+                continue
+
     eta_value = captured.get("eta_min")
     delivery_fee_raw = captured.get("deliveryFeeRaw")
     free_uber_one = bool(captured.get("deliveryFreeWithUberOne"))
     free_unconditional = bool(captured.get("deliveryFreeUnconditional"))
     promo = captured.get("promoText")
-    store_name = restaurant.get("name") or captured.get("store_name_hint")
+    store_name = (restaurant.get("name") if restaurant else None) or captured.get(
+        "store_name_hint"
+    )
     store_id = _store_id_from_url(captured.get("url") or "")
 
     # Tarifa efectiva:

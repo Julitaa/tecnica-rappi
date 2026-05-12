@@ -2,6 +2,5 @@ sku,canonical_name,vertical,search_keywords,price_min_mxn,price_max_mxn,exclude_
 big_mac,Big Mac,fast_food,"big mac|bigmac",80,150,"mctrio|mc trio|mctrío|combo|trio|mccombo|cuarteto"
 mcombo_bigmac_med,Combo Big Mac mediano,fast_food,"combo big mac|mctrio big mac|mctrío big mac|big mac mediano|big mac med",150,250,"grande|gigante"
 mcnuggets_10,McNuggets 10 piezas,fast_food,"nuggets 10|10 piezas|10 pz|nuggets x10|mcnuggets 10",60,150,"4 pz|4 piezas|6 pz|6 piezas|20 pz|20 piezas"
-cocacola_500ml,Coca-Cola 500ml,retail,"coca cola 500|coca-cola 500|cocacola 500|coca 500",20,50,
-agua_1l,Agua embotellada 1L,retail,"agua 1l|agua 1 l|agua natural 1|bonafont 1l|ciel 1l|epura 1l",15,40,
-panales_t4,Pañales talla 4 (24-40u),retail,"huggies|pampers|kleenbebe",200,600,"talla 1|talla 2|talla 3|talla 5|talla 6|recien nacido|recién nacido|premium care|toallitas|húmedas|humedas|wipes"
+cocacola_500ml,Coca-Cola ~500ml,retail,"coca-cola|coca cola|cocacola",18,32,"1 l|1l|1.5|1.75|2 l|3 l|familiar|jarritos|powerade|monster|sabor a|jugo|kuat"
+agua_1l,Agua embotellada ~1L,retail,"bonafont|ciel|epura|e-pura|agua natural|agua purificada|agua mineral|topo chico",10,55,"5 l|sin sodio|sabor"

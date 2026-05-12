@@ -51,3 +51,24 @@ Ver [`docs/compliance.md`](compliance.md) para el detalle del límite ético y [
 
 - Notebook de insights no generado.
 - Para `cocacola_500ml` y `agua_1l`: evaluar si scrapeamos Rappi Turbo/Express como segundo store o si los excluimos del análisis de fast food puro (siguen con `available=False, notes="no_match_in_menu"` en las 3 plataformas).
+
+## 2026-05-12 · Tramo 6 (Retail OXXO)
+
+**Pivot del spec.** El spec original (`2026-05-12-retail-walmart-design.md`) eligió Walmart Súper. Durante implementación descubrí que **Walmart no está en Uber Eats MX** (la búsqueda solo devuelve restaurantes con dirección "Walmart" como referencia). En Rappi sí existe Walmart, pero para paridad cross-plataforma pivoteamos a **OXXO** (la conveniencia más ubicua de México, ~22k tiendas).
+
+**Implementación retail.** Rappi tiendas y UE tiendas exponen el menú con un schema **distinto** al de restaurantes:
+
+- **Rappi tiendas**: en lugar de `<script id="seo-structured-schema">` con `hasMenu`, hay múltiples `<script type="application/ld+json">` con `@type=ItemList → itemListElement[].item (Product)` — uno por categoría visible en el storefront. Implementé `_iter_item_list_items` que aplana esos arrays.
+- **UE tiendas**: NO exponen `hasMenu` en JSON-LD ni ItemList con productos. Además la CSP de las storefront pages bloquea `wait_for_function` (unsafe-eval). Solución: parseo del `innerText` del body buscando pares `$<precio>\n<nombre>` (heurística DOM, más frágil pero funciona).
+
+**Modal address_capture en Rappi.** En brand pages de restaurantes Rappi muestra el modal "Usa tu ubicación actual"; en URLs de tienda concretas (ej. `/tiendas/<id>-oxxo-express-nc`) NO. Hice el click condicional al modal.
+
+**Pañales (`panales_t4`): producto removido del catálogo.** OXXO Express en Rappi y en UE NO vende pañales (recorrí los ItemList y el innerText con keywords `huggies|pampers|kleenbebe` → 0 matches en las 6 direcciones). Es coherente con que OXXO es tienda de conveniencia (snacks/bebidas/alcohol), no supermercado. Decisión: remover `panales_t4` del catálogo (`data/products.csv`) y documentar el hallazgo aquí. Para incluir pañales habría que cambiar a un supermercado real (Soriana, Chedraui, La Comer), pero esos no están uniformemente presentes en CDMX + EdoMex en ambas plataformas.
+
+**Horario del scrape sesga McDonald's.** Las corridas se hicieron a la hora de **desayuno mexicano** (~7–9 AM CST). En 5 de 6 direcciones, Rappi devolvió el menú parcial de desayuno (McMuffin, Hot Cakes, McBurrito) sin Big Mac/McNuggets/combos. Roma Norte fue la excepción (menú completo de 83 items, posiblemente cacheado). Es comportamiento real de la app, no bug del scraper. **Insight para la presentación**: el catálogo activo de un restaurante en una plataforma de delivery depende del horario; un análisis competitivo robusto requiere scrapes en múltiples ventanas horarias.
+
+**UE: detección progresiva de bots.** Las búsquedas para `/store/mcdonalds` y `/store/oxxo` degradan a 0 anchors tras varias corridas seguidas desde la misma IP/contexto, aunque la primera corrida fresh da resultados (ej. UE OXXO: 8/18 en primer scrape, 0/12 después). Mitigaciones intentadas: wait_for_selector en lugar de wait_for_function (la CSP del storefront bloquea unsafe-eval), timeouts de 25s, User-Agent realista. **Sin proxies rotativos**, este blocker es estructural — UE detecta el patrón de Playwright headless. Para un sistema de producción habría que: (a) proxies residenciales, (b) browser stealth plugin, o (c) sesiones logueadas. Quedó fuera del scope ético y temporal del MVP.
+
+**Corrida final (2026-05-12 ~14:30 CST):** 15/78 filas con `available=True`. Desglose: Rappi McDonald's 3/18 (Roma Norte completo; las otras 5 direcciones devolvieron menú de desayuno), Rappi OXXO 12/12 (100%), UE McDonald's 0/18 (bot detection + horario), UE OXXO 0/12 (bot detection), DiDi 0/18 (app-only, esperado).
+
+**Service fee** sigue siendo 0 (no expuesto pre-checkout, ver `compliance.md`).

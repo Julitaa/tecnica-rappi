@@ -9,8 +9,15 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import logging
 from dataclasses import asdict
 from pathlib import Path
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(name)s %(levelname)s %(message)s",
+    datefmt="%H:%M:%S",
+)
 
 from .base import PlatformScraper
 from .catalog import DATA_DIR, load_addresses, load_brands, load_products
@@ -111,10 +118,13 @@ async def _run(platform: str, brand_filter: str | None) -> list[ScrapeRow]:
     addresses = load_addresses()
     products = load_products()
     scrapers = _build_scrapers(platform, brand_filter)
-    results = await asyncio.gather(
-        *(_run_one(s, addresses, products) for s in scrapers)
-    )
-    return [row for batch in results for row in batch]
+    # Serial (no gather): correr 4 chromes en paralelo en Windows satura
+    # recursos y los scrapers se traban indefinidamente en la primera
+    # dirección. Serial agrega ~3-4 min al wall-clock pero es predecible.
+    all_rows: list[ScrapeRow] = []
+    for s in scrapers:
+        all_rows.extend(await _run_one(s, addresses, products))
+    return all_rows
 
 
 def _write_csv(rows: list[ScrapeRow], path: Path) -> None:

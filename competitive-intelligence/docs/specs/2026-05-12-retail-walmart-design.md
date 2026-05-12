@@ -1,4 +1,6 @@
-# Retail vertical (Walmart Súper) — extensión del scraper
+# Retail vertical (~~Walmart Súper~~ OXXO) — extensión del scraper
+
+> **Update post-implementación (2026-05-12):** Walmart no está en Uber Eats MX. Pivot a **OXXO** durante implementación. Pañales removidos (OXXO no los vende). Ver `docs/blockers.md` tramo 6 para detalle.
 
 **Fecha:** 2026-05-12
 **Autor:** Julieta Pages
