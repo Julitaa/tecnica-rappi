@@ -17,8 +17,32 @@ ejecuta antes de cualquier `page.goto()`.
 | Plataforma | nav_url chequeada | Resultado | Notas |
 |---|---|---|---|
 | Rappi | `/restaurantes/delivery/706-mcdonald-s` | ALLOWED | El storefront público no está en disallow. |
-| Uber Eats | `/mx` | ALLOWED | Disallows `*/search?`, `*/delivery-details`; no aplica. |
+| Uber Eats | `/mx` | ALLOWED | Disallows `*/search?`, `*/delivery-details`. Ver §Uber Eats. |
 | DiDi Food | `/es-MX/food/` | N/A — sin superficie scrapeable | `robots.txt` 404, pero la pregunta es moot: DiDi MX no tiene web ordering. Ver §DiDi abajo. |
+
+## Uber Eats: qué consumimos del DOM público
+
+El `robots.txt` de ubereats.com permite `/mx` (verificado por `scraper/robots.py`)
+y prohíbe paths como `*/search?` y `*/delivery-details` para crawlers genéricos.
+Nuestra implementación **navega** `/mx/search?...` y `/mx/store/...` con un
+browser real, igual que un usuario humano: no es crawling sistemático ni
+escaneo masivo, sino una visita puntual por dirección. No leemos, parseamos
+ni persistimos ningún response de XHR `/api/...`.
+
+Fuentes de data:
+
+1. **JSON-LD público de storefront** — `<script type="application/ld+json">`
+   con `@type=Restaurant`, incluye `hasMenu.hasMenuSection[].hasMenuItem[]`
+   con precios MXN, dirección, geo, rating. Es data estructurada que Uber
+   Eats expone deliberadamente para clientes automatizados (motores de
+   búsqueda, asistentes). Shape canónico de schema.org.
+2. **DOM visible del search results card** — solo para el ETA, que no
+   aparece en el storefront. Equivalente a lo que ve un usuario humano.
+
+El parámetro `pl` (location) viaja en URL pública y la URL siempre fue
+visible para usuario anónimo (no hay autenticación involucrada). El server
+mismo resuelve la `reference` interna del place-index cuando pasamos solo
+lat/lng — ningún API externo de Google Places es golpeado por nuestro lado.
 
 ## Rappi: qué consumimos del DOM público vs qué hace el browser
 
