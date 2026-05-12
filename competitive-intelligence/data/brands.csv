@@ -1,0 +1,5 @@
+brand_id,platform,vertical,nav_strategy,nav_param
+mcdonalds,rappi,fast_food,brand_url,https://www.rappi.com.mx/restaurantes/delivery/706-mcdonald-s
+mcdonalds,ubereats,fast_food,search_query,mcdonalds
+walmart_super,rappi,retail,brand_url,https://www.rappi.com.mx/tiendas/900116707-walmart-super
+walmart_super,ubereats,retail,search_query,walmart

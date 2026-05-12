@@ -5,7 +5,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-from .models import Address, Product
+from .models import Address, Brand, Product
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
@@ -46,6 +46,22 @@ def load_products(path: Path | None = None) -> list[Product]:
                     for k in (row.get("exclude_keywords") or "").split("|")
                     if k.strip()
                 ),
+            )
+            for row in reader
+        ]
+
+
+def load_brands(path: Path | None = None) -> list[Brand]:
+    path = path or (DATA_DIR / "brands.csv")
+    with path.open(encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        return [
+            Brand(
+                brand_id=row["brand_id"],
+                platform=row["platform"],  # type: ignore[arg-type]
+                vertical=row["vertical"],
+                nav_strategy=row["nav_strategy"],  # type: ignore[arg-type]
+                nav_param=row["nav_param"],
             )
             for row in reader
         ]
