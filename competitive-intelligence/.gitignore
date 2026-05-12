@@ -6,4 +6,5 @@ venv/
 .ipynb_checkpoints/
 .pytest_cache/
 probe_output/
-scripts/
+scripts/*
+!scripts/build_notebook.py
