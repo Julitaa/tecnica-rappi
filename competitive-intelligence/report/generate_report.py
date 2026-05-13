@@ -687,6 +687,130 @@ def make_geo_chart(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
+def make_retail_price_chart(df: pd.DataFrame) -> go.Figure:
+    """Bar chart: avg unit price by retail SKU x platform (available rows only)."""
+    av = df[(df["available"] == True) & (df["brand_id"] == "oxxo")]
+    retail_skus = ["cocacola_500ml", "agua_1l"]
+
+    fig = go.Figure()
+    for platform in ["rappi", "ubereats"]:
+        pdata = av[av["platform"] == platform]
+        prices = pdata.groupby("product_sku")["unit_price_mxn"].mean()
+        x_labels = [SKU_LABELS[s] for s in retail_skus if s in prices.index]
+        y_vals   = [prices[s] for s in retail_skus if s in prices.index]
+        if not y_vals:
+            continue
+        fig.add_trace(go.Bar(
+            name=PLATFORM_LABELS[platform],
+            x=x_labels,
+            y=y_vals,
+            marker_color=PLATFORM_COLORS[platform],
+            text=[f"${v:.1f}" for v in y_vals],
+            textposition="outside",
+        ))
+
+    fig.update_layout(
+        barmode="group",
+        template="plotly_white",
+        height=320,
+        margin=dict(l=20, r=20, t=10, b=40),
+        yaxis_title="MXN",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        font=dict(family="Inter, system-ui, sans-serif", size=12),
+    )
+    return fig
+
+
+def make_retail_avail_chart(df: pd.DataFrame) -> go.Figure:
+    """Heatmap: OXXO availability (1=yes, 0=no) by zone x platform."""
+    rt = df[df["brand_id"] == "oxxo"]
+    pivot = (
+        rt.groupby(["address_label", "platform"])["available"]
+        .mean()
+        .unstack("platform")
+        .reindex(columns=["rappi", "ubereats"])
+        .dropna(axis=1, how="all")
+    )
+    z = pivot.values
+    text = [
+        ["✓" if v == 1.0 else ("~" if (v is not None and not pd.isna(v) and 0 < v < 1) else "✗") for v in row]
+        for row in z
+    ]
+    fig = go.Figure(data=go.Heatmap(
+        z=z,
+        x=[PLATFORM_LABELS.get(c, c) for c in pivot.columns],
+        y=list(pivot.index),
+        colorscale=[[0, "#FEE2E2"], [0.5, "#FEF3C7"], [1, "#D1FAE5"]],
+        zmin=0, zmax=1,
+        text=text,
+        texttemplate="%{text}",
+        showscale=False,
+    ))
+    fig.update_layout(
+        template="plotly_white",
+        height=max(280, 22 * len(pivot)),
+        margin=dict(l=20, r=20, t=10, b=20),
+        font=dict(family="Inter, system-ui, sans-serif", size=12),
+    )
+    return fig
+
+
+def make_retail_fees_chart(df: pd.DataFrame) -> go.Figure:
+    """Bar: avg delivery fee by platform for retail (OXXO), available rows."""
+    av = df[(df["available"] == True) & (df["brand_id"] == "oxxo")]
+    fees = av.groupby("platform")[["delivery_fee_mxn", "discount_mxn"]].mean().round(1)
+    platforms_present = [p for p in ["rappi", "ubereats"] if p in fees.index]
+
+    fig = go.Figure()
+    for col, label, color in [
+        ("delivery_fee_mxn", "Delivery fee bruto", "#4C72B0"),
+        ("discount_mxn",     "Descuento aplicado", "#C44E52"),
+    ]:
+        y_vals = [fees.loc[p, col] if p in fees.index else 0 for p in platforms_present]
+        fig.add_trace(go.Bar(
+            name=label,
+            x=[PLATFORM_LABELS[p] for p in platforms_present],
+            y=y_vals,
+            marker_color=color,
+            text=[f"${v:.1f}" for v in y_vals],
+            textposition="outside",
+        ))
+
+    fig.update_layout(
+        barmode="group",
+        template="plotly_white",
+        height=280,
+        margin=dict(l=20, r=20, t=10, b=40),
+        yaxis_title="MXN",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        font=dict(family="Inter, system-ui, sans-serif", size=12),
+    )
+    return fig
+
+
+def make_retail_promos_chart(df: pd.DataFrame) -> go.Figure:
+    """Bar: % of OXXO rows with visible promo text, by platform."""
+    rt = df[df["brand_id"] == "oxxo"]
+    pct = rt.groupby("platform")["has_promo"].mean().mul(100).round(1)
+    platforms = [p for p in ["rappi", "ubereats", "didi"] if p in pct.index]
+
+    fig = go.Figure(go.Bar(
+        x=[PLATFORM_LABELS.get(p, p) for p in platforms],
+        y=[pct[p] for p in platforms],
+        marker_color=[PLATFORM_COLORS.get(p, "#888") for p in platforms],
+        text=[f"{pct[p]:.0f}%" for p in platforms],
+        textposition="outside",
+    ))
+    fig.update_layout(
+        template="plotly_white",
+        height=260,
+        margin=dict(l=20, r=20, t=10, b=40),
+        yaxis=dict(title="%", range=[0, 120]),
+        font=dict(family="Inter, system-ui, sans-serif", size=12),
+    )
+    return fig
+
+
 def compose_html(df: pd.DataFrame) -> str:
     """Build and return the complete HTML report string."""
     figs = {
