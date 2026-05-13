@@ -23,7 +23,7 @@ Flujo por dirección:
      a la sede correcta si la pl no la sirve — si la tienda específica
      "no entrega a esa dirección" devuelve 200 con un banner "no
      disponible", que detectamos y emitimos `available=False`.
-
+    
 Por simplicidad y robustez en el time-box: navegamos `/mx/search?q=mcdonalds
 &pl=...` y tomamos el primer resultado `/store/mcdonalds-*`. Eso da el store
 más cercano + ETA en la misma card.

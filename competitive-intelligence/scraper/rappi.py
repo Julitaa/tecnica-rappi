@@ -1,5 +1,5 @@
 """Rappi scraper — Playwright anónimo, extracción del DOM público.
-
+    
 Cumplimiento de robots.txt: el `robots.txt` de Rappi prohíbe `/api`, `/api-services`
 y `/base-api` para User-agent: *. Por eso NO interceptamos ningún response de
 esos endpoints. Trabajamos exclusivamente con:
