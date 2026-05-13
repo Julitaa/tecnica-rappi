@@ -1,7 +1,8 @@
 import json
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Query, Request
+from fastapi.responses import Response, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse
 
@@ -10,6 +11,8 @@ from app.data.loader import load_data
 from app.data.repository import Repository
 from app.chat.service import ChatService
 from app.api.schemas import ChatRequest, ResetRequest
+from app.insights.reporter import generate_markdown_report
+from app.insights.pdf import markdown_to_pdf_bytes
 
 logging.basicConfig(level=settings.log_level)
 log = logging.getLogger(__name__)
@@ -57,6 +60,19 @@ async def chat(req: ChatRequest, request: Request):
             yield {"data": json.dumps(ev, ensure_ascii=False)}
 
     return EventSourceResponse(event_gen())
+
+
+@app.post("/report")
+async def report(request: Request, format: str = Query("pdf")):
+    repo: Repository = request.app.state.repo
+    md_text = await generate_markdown_report(repo)
+    if format == "markdown":
+        return PlainTextResponse(md_text, media_type="text/markdown; charset=utf-8")
+    pdf = markdown_to_pdf_bytes(md_text)
+    return Response(
+        content=pdf, media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="rappi-insights.pdf"'},
+    )
 
 
 @app.post("/chat/reset")
