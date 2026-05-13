@@ -42,6 +42,15 @@ class Toolbox:
         df = df[(df["metric"] == metric)
                 & (df["country"] == country)
                 & (df["zone"] == zone)]
+        if df.empty:
+            # Auto-detect country if zone exists under a different country code
+            by_zone = self.repo.metrics[
+                (self.repo.metrics["metric"] == metric)
+                & (self.repo.metrics["zone"] == zone)
+            ]
+            if not by_zone.empty:
+                df = by_zone
+                country = str(by_zone["country"].iloc[0])
         df = df.sort_values("week_offset", ascending=False).head(weeks)
         data = df[["week_offset", "value"]].to_dict("records")
         if not data:
