@@ -813,16 +813,21 @@ def make_retail_promos_chart(df: pd.DataFrame) -> go.Figure:
 
 def compose_html(df: pd.DataFrame) -> str:
     """Build and return the complete HTML report string."""
-    figs = {
-        "chart-prices": make_price_chart(df),
-        "chart-eta": make_eta_chart(df),
-        "chart-fees": make_fees_chart(df),
-        "chart-promos": make_promos_chart(df),
-        "chart-geo": make_geo_chart(df),
-    }
-    chart_divs = {k: _fig_div(v, k) for k, v in figs.items()}
+    stats = compute_stats(df)
 
-    snapshot_date = df["timestamp_utc"].dropna().iloc[0][:10] if "timestamp_utc" in df.columns else "2026-05-13"
+    figs = {
+        "chart-ff-prices":  make_price_chart(df),
+        "chart-ff-eta":     make_eta_chart(df),
+        "chart-ff-fees":    make_fees_chart(df),
+        "chart-ff-promos":  make_promos_chart(df),
+        "chart-rt-prices":  make_retail_price_chart(df),
+        "chart-rt-avail":   make_retail_avail_chart(df),
+        "chart-rt-fees":    make_retail_fees_chart(df),
+        "chart-rt-promos":  make_retail_promos_chart(df),
+        "chart-geo":        make_geo_chart(df),
+    }
+    cd = {k: _fig_div(v, k) for k, v in figs.items()}
+    s = stats
 
     return f"""<!DOCTYPE html>
 <html lang="es">
@@ -843,12 +848,22 @@ def compose_html(df: pd.DataFrame) -> str:
       <a href="#exec-summary">Executive Summary</a>
     </div>
     <div class="section-group">
-      <div class="section-label">Análisis</div>
-      <a href="#precios">1. Precios</a>
-      <a href="#eta">2. Tiempos de entrega</a>
-      <a href="#fees">3. Estructura de fees</a>
-      <a href="#promos">4. Promociones</a>
-      <a href="#geo">5. Variabilidad geográfica</a>
+      <div class="section-label">Fast Food (McD)</div>
+      <a href="#ff-precios">01 Precios</a>
+      <a href="#ff-eta">02 Tiempos de entrega</a>
+      <a href="#ff-fees">03 Fees</a>
+      <a href="#ff-promos">04 Promociones</a>
+    </div>
+    <div class="section-group">
+      <div class="section-label">Retail (OXXO)</div>
+      <a href="#rt-precios">05 Precios</a>
+      <a href="#rt-avail">06 Disponibilidad</a>
+      <a href="#rt-fees">07 Fees</a>
+      <a href="#rt-promos">08 Promociones</a>
+    </div>
+    <div class="section-group">
+      <div class="section-label">Cruzado</div>
+      <a href="#geo">09 Variabilidad geográfica</a>
     </div>
     <div class="section-group">
       <div class="section-label">Conclusiones</div>
@@ -865,104 +880,154 @@ def compose_html(df: pd.DataFrame) -> str:
     <div class="cover-tag">Documento confidencial · Uso interno Rappi</div>
     <h1>Competitive Intelligence<br>Rappi vs Uber Eats vs DiDi Food</h1>
     <p style="opacity:0.9;font-size:15px;margin-top:12px;line-height:1.5;">
-      Análisis comparativo estructurado · CDMX + EdoMex · McDonald's + OXXO
+      Análisis comparativo estructurado · CDMX + EdoMex · McDonald's + OXXO · {len(s['zones'])} zonas
     </p>
     <div class="cover-meta">
-      <span>📅 Snapshot: {snapshot_date}</span>
-      <span>✍️ Julieta Pages</span>
-      <span>🎯 Rappi AI Engineer Challenge</span>
+      <span>Snapshot: {s['snapshot_date']}</span>
+      <span>Julieta Pages</span>
+      <span>Rappi AI Engineer Challenge</span>
     </div>
   </div>
 
   <!-- EXECUTIVE SUMMARY -->
   <section id="exec-summary">
     <h2>Executive Summary</h2>
-    {_exec_summary_html(df)}
+    {_exec_summary_html(df, s)}
   </section>
 
-  <!-- SECCIÓN 1: PRECIOS -->
-  <section id="precios">
-    <h2><span class="section-number">01</span>Posicionamiento de precios</h2>
+  <!-- FAST FOOD SECTIONS -->
+  <section id="ff-precios">
+    <h2><span class="section-number">01</span>Posicionamiento de precios — Fast Food (McDonald's)</h2>
     <p style="color:#6B7280;font-size:13px;margin-bottom:12px;">
-      Precio unitario promedio por SKU y plataforma — McDonald's, filas disponibles únicamente.
+      Precio unitario promedio por SKU y plataforma — filas disponibles únicamente.
     </p>
-    {chart_divs["chart-prices"]}
+    {cd["chart-ff-prices"]}
     <div class="reading">
-      <strong>Lectura:</strong> Rappi y Uber Eats tienen <strong>paridad exacta de precio de producto</strong>
-      en los 3 SKUs de fast food (Big Mac $130, McNuggets $138, Combo Big Mac med. $169 MXN).
+      <strong>Lectura:</strong> Rappi y Uber Eats tienen <strong>paridad de precio de producto</strong>
+      en los 3 SKUs de fast food: Big Mac ~${s['ff_price_bigmac_rappi']:.0f} MXN, McNuggets ~${s['ff_price_nuggets_rappi']:.0f} MXN,
+      Combo ~${s['ff_price_combo_rappi']:.0f} MXN (Rappi) vs ${s['ff_price_bigmac_ue']:.0f} / ${s['ff_price_nuggets_ue']:.0f} / ${s['ff_price_combo_ue']:.0f} MXN (UberEats).
       La diferenciación competitiva <strong>no ocurre en el precio del producto</strong> sino en fees,
       ETA y comunicación de promociones — ver secciones siguientes.
-      DiDi no expuso datos cuantitativos en este muestreo (app-only en CDMX).
     </div>
   </section>
 
-  <!-- SECCIÓN 2: ETA -->
-  <section id="eta">
-    <h2><span class="section-number">02</span>Ventaja/desventaja operacional — Tiempos de entrega</h2>
+  <section id="ff-eta">
+    <h2><span class="section-number">02</span>Ventaja operacional — Tiempos de entrega (Fast Food)</h2>
     <p style="color:#6B7280;font-size:13px;margin-bottom:12px;">
       ETA promedio (minutos) por zona × plataforma. Colores más oscuros = más rápido.
     </p>
-    {chart_divs["chart-eta"]}
+    {cd["chart-ff-eta"]}
     <div class="reading">
-      <strong>Lectura:</strong> Uber Eats entrega entre <strong>10 y 23 min</strong>;
-      Rappi entre <strong>14 y 49 min</strong> — una brecha de 2× a 3.5× según zona.
-      La única zona donde Rappi <em>empata</em> en velocidad con Uber Eats es
-      <strong>Roma Norte (14 min)</strong>, consistente con su mayor densidad histórica de repartidores.
-      <strong>Polanco y Del Valle registran 49 min en Rappi</strong> — paradójicamente las zonas
-      de mayor poder adquisitivo y mayor riesgo de churn.
+      <strong>Lectura:</strong> Uber Eats entrega entre <strong>{s['ff_eta_ue_min']} y {s['ff_eta_ue_max']} min</strong>;
+      Rappi entre <strong>{s['ff_eta_rappi_min']} y {s['ff_eta_rappi_max']} min</strong>.
+      Las únicas zonas donde Rappi empata en velocidad son <strong>Roma Norte</strong> y <strong>Santa Fe</strong> (ambas {s['ff_eta_rappi_min']} min).
+      En zonas periféricas (Alvaro Obregón 49 min, Insurgentes Sur 35 min, Gustavo A. Madero 35 min)
+      la brecha llega a <strong>2–3×</strong> — las de mayor riesgo de churn.
     </div>
   </section>
 
-  <!-- SECCIÓN 3: FEES -->
-  <section id="fees">
-    <h2><span class="section-number">03</span>Estructura de fees</h2>
+  <section id="ff-fees">
+    <h2><span class="section-number">03</span>Estructura de fees — Fast Food</h2>
     <p style="color:#6B7280;font-size:13px;margin-bottom:12px;">
-      Desglose promedio del ticket por plataforma: precio producto + delivery fee + service fee + descuento.
+      Desglose promedio del ticket: precio producto + delivery fee + service fee + descuento.
     </p>
-    {chart_divs["chart-fees"]}
+    {cd["chart-ff-fees"]}
     <div class="reading">
-      <strong>Lectura:</strong> Rappi muestra un <strong>delivery fee de $16 MXN</strong> y luego aplica
-      un <strong>descuento de -$16 MXN</strong> en el campo numérico — resultado neto: $0.
-      Uber Eats directamente expone <strong>delivery fee = $0</strong>.
-      Mismo resultado económico al usuario, <strong>dos narrativas opuestas</strong>:
-      Uber Eats vende "envío gratis"; Rappi entrega el beneficio en silencio.
-      La narrativa de Uber Eats es psicológicamente más fuerte para el primer pedido.
+      <strong>Lectura:</strong> Rappi muestra un <strong>delivery fee promedio de ${s['ff_delivery_rappi']:.0f} MXN</strong> y aplica
+      un <strong>descuento de ${s['ff_discount_rappi']:.0f} MXN</strong> — resultado neto: $0.
+      Uber Eats expone directamente <strong>delivery fee = $0</strong>.
+      Mismo resultado económico para el usuario, <strong>dos narrativas opuestas</strong>:
+      UberEats vende "envío gratis"; Rappi entrega el beneficio en silencio y pierde el crédito psicológico.
     </div>
   </section>
 
-  <!-- SECCIÓN 4: PROMOS -->
-  <section id="promos">
-    <h2><span class="section-number">04</span>Estrategia promocional</h2>
+  <section id="ff-promos">
+    <h2><span class="section-number">04</span>Estrategia promocional — Fast Food</h2>
     <p style="color:#6B7280;font-size:13px;margin-bottom:12px;">
       % de filas con texto promocional visible al usuario (sin login).
     </p>
-    {chart_divs["chart-promos"]}
-    {_promo_table_html(df)}
+    {cd["chart-ff-promos"]}
+    {_promo_table_html(df, brand_id="mcdonalds")}
     <div class="reading">
-      <strong>Lectura:</strong> <strong>Uber Eats comunica promos en el 60% del menú visitado</strong>,
-      todas con foco acquisition ("usuarios nuevos", "gasto $100").
-      <strong>Rappi muestra 0% texto promocional</strong> aunque internamente aplica un descuento
-      numérico equivalente.
-      Uber Eats convierte cada impresión de menú en un <em>call-to-action</em> de adquisición;
-      Rappi pierde esa oportunidad psicológica.
+      <strong>Lectura:</strong> <strong>Uber Eats comunica promos en el {s['ff_promo_pct_ue']:.0f}% del menú visitado</strong>
+      ("envío gratis usuarios nuevos", "2–3 ofertas disponibles").
+      <strong>Rappi muestra {s['ff_promo_pct_rappi']:.0f}% texto promocional</strong> aunque internamente aplica un descuento
+      numérico equivalente. Uber Eats convierte cada impresión de menú en un <em>call-to-action</em> de adquisición;
+      Rappi pierde esa oportunidad.
     </div>
   </section>
 
-  <!-- SECCIÓN 5: GEO -->
-  <section id="geo">
-    <h2><span class="section-number">05</span>Variabilidad geográfica</h2>
+  <!-- RETAIL SECTIONS -->
+  <section id="rt-precios">
+    <h2><span class="section-number">05</span>Posicionamiento de precios — Retail (OXXO)</h2>
     <p style="color:#6B7280;font-size:13px;margin-bottom:12px;">
-      Ticket final promedio por zona × plataforma — McDonald's (fast food), filas disponibles.
+      Precio unitario promedio por SKU y plataforma — filas disponibles.
     </p>
-    {chart_divs["chart-geo"]}
+    {cd["chart-rt-prices"]}
     <div class="reading">
-      <strong>Lectura:</strong> El ticket final varía relativamente poco entre zonas en términos
-      de precio de producto (mismos precios nacionales en McDonald's).
-      Donde sí hay diferencias es en la <strong>disponibilidad</strong>:
-      Uber Eats capturó McDonald's en más zonas pero Rappi cubrió también OXXO.
-      La <strong>competitividad de Rappi es zona-dependiente operacionalmente</strong>:
-      gana donde tiene densidad de riders (Roma Norte), pierde donde no la tiene
-      (Polanco: 49 min vs 10 min de Uber Eats).
+      <strong>Lectura:</strong> <strong>Rappi tiene precios retail sistemáticamente más bajos que UberEats.</strong>
+      Coca-Cola 500ml: Rappi ${s['rt_price_coca_rappi']:.1f} vs UberEats ${s['rt_price_coca_ue']:.1f} MXN
+      (+{((s['rt_price_coca_ue']/s['rt_price_coca_rappi'])-1)*100:.0f}% más caro en UE).
+      Agua 1L: Rappi ${s['rt_price_agua_rappi']:.1f} vs UberEats ${s['rt_price_agua_ue']:.1f} MXN
+      (+{((s['rt_price_agua_ue']/s['rt_price_agua_rappi'])-1)*100:.0f}% más caro en UE).
+      Esta ventaja de precio es <strong>real y no comunicada</strong> al usuario.
+    </div>
+  </section>
+
+  <section id="rt-avail">
+    <h2><span class="section-number">06</span>Disponibilidad por zona — Retail (OXXO)</h2>
+    <p style="color:#6B7280;font-size:13px;margin-bottom:12px;">
+      Verde = disponible · amarillo = parcial · rojo = no disponible
+    </p>
+    {cd["chart-rt-avail"]}
+    <div class="reading">
+      <strong>Lectura:</strong> Rappi tiene disponibilidad de OXXO en <strong>{s['rt_avail_rappi']}/{s['rt_total_rappi']} zonas</strong> ({s['rt_avail_rappi']/s['rt_total_rappi']*100:.0f}%).
+      UberEats tiene <strong>{s['rt_avail_ue']}/{s['rt_total_ue']} zonas</strong> ({s['rt_avail_ue']/s['rt_total_ue']*100:.0f}%).
+      Rappi lidera en cobertura Y en precio — la combinación de ambas ventajas hace del vertical retail
+      la <strong>mayor oportunidad de diferenciación no explotada</strong> del análisis.
+    </div>
+  </section>
+
+  <section id="rt-fees">
+    <h2><span class="section-number">07</span>Estructura de fees — Retail (OXXO)</h2>
+    <p style="color:#6B7280;font-size:13px;margin-bottom:12px;">
+      Delivery fee bruto y descuento aplicado por plataforma en pedidos OXXO.
+    </p>
+    {cd["chart-rt-fees"]}
+    <div class="reading">
+      <strong>Lectura:</strong> La estructura de fees en retail sigue el mismo patrón que en fast food —
+      Rappi aplica un fee y luego un descuento equivalente, UberEats cobra $0 directo.
+      El resultado neto para el usuario es comparable, pero la narrativa nuevamente favorece a UberEats.
+    </div>
+  </section>
+
+  <section id="rt-promos">
+    <h2><span class="section-number">08</span>Estrategia promocional — Retail (OXXO)</h2>
+    <p style="color:#6B7280;font-size:13px;margin-bottom:12px;">
+      % de filas con texto promocional visible al usuario (sin login), vertical retail.
+    </p>
+    {cd["chart-rt-promos"]}
+    {_promo_table_html(df, brand_id="oxxo")}
+    <div class="reading">
+      <strong>Lectura:</strong> Ninguna plataforma muestra texto promocional visible en el vertical retail.
+      Rappi {s['rt_promo_pct_rappi']:.0f}%, UberEats {s['rt_promo_pct_ue']:.0f}%.
+      Dado que Rappi tiene ventaja real de precio ({((s['rt_price_coca_ue']/s['rt_price_coca_rappi'])-1)*100:.0f}%–{((s['rt_price_agua_ue']/s['rt_price_agua_rappi'])-1)*100:.0f}% más barato),
+      el silencio promocional en retail es la mayor oportunidad de comunicación sin costo incremental.
+    </div>
+  </section>
+
+  <!-- GEO -->
+  <section id="geo">
+    <h2><span class="section-number">09</span>Variabilidad geográfica — Fast Food</h2>
+    <p style="color:#6B7280;font-size:13px;margin-bottom:12px;">
+      Ticket final promedio por zona × plataforma — McDonald's, filas disponibles.
+    </p>
+    {cd["chart-geo"]}
+    <div class="reading">
+      <strong>Lectura:</strong> El precio de producto es nacional y uniforme en McDonald's, por lo que
+      la variabilidad geográfica refleja principalmente <strong>disponibilidad</strong> (qué zonas cubrió cada plataforma)
+      y <strong>fee structure</strong> (delivery fee, descuentos).
+      El análisis cubre {len(s['zones'])} zonas: {', '.join(s['zones'][:8])}{'...' if len(s['zones']) > 8 else ''}.
     </div>
   </section>
 
@@ -976,28 +1041,29 @@ def compose_html(df: pd.DataFrame) -> str:
   <section id="limitaciones" class="limitations">
     <h2>Limitaciones y próximos pasos</h2>
     <ul>
-      <li><strong>Muestra pequeña</strong> (51 observaciones disponibles de 78). Los insights son <em>direccionales</em>, no estadísticamente significativos.</li>
-      <li><strong>Snapshot único</strong> ({snapshot_date}, ~02:00 UTC). Sin variabilidad temporal — un horario de almuerzo o cena podría modificar los ETAs.</li>
+      <li><strong>Muestra dirigida</strong> ({s['n_available']} observaciones disponibles de {s['n_total']}). Los insights son <em>direccionales</em>, no estadísticamente significativos.</li>
+      <li><strong>Snapshot único</strong> ({s['snapshot_date']}, ~02:00 UTC). Sin variabilidad temporal — un horario de almuerzo o cena podría modificar los ETAs significativamente.</li>
       <li><strong>Usuario anónimo (sin login).</strong> Fees y promos reflejan la oferta de adquisición; usuarios Prime/recurrentes verían condiciones distintas.</li>
       <li><strong>DiDi sin cobertura cuantitativa</strong> — limitación estructural (app-only en CDMX). Mystery shopping manual sería el próximo paso.</li>
-      <li><strong>SKUs retail</strong> no matchearon en McDonald's (sin sorpresa); se capturaron en OXXO vía Rappi únicamente.</li>
+      <li><strong>Cobertura asimétrica:</strong> no todas las zonas tienen datos de ambas plataformas en fast food. La comparación ETA es válida solo donde ambas plataformas tienen datos.</li>
     </ul>
     <div class="next-steps">
       <h3>Próximos pasos sugeridos</h3>
       <ol>
-        <li>Correr el scraper en 3 horarios distintos (almuerzo / cena / madrugada) y comparar varianza intra-día de ETAs.</li>
-        <li>Expandir muestra a 20+ direcciones para significancia estadística en el análisis geo.</li>
-        <li>Mystery shopping manual de DiDi en 2 zonas para punto de comparación cualitativo.</li>
+        <li>Correr el scraper en 3 horarios (almuerzo 13h / cena 20h / madrugada 02h) y comparar varianza intra-día de ETAs en las 5 zonas con mayor brecha.</li>
+        <li>Lanzar campaña A/B de comunicación de precio retail ("OXXO más barato en Rappi") — bajo costo, alto potencial de diferenciación.</li>
+        <li>Mystery shopping manual de DiDi en Iztapalapa y Ecatepec para punto de comparación cualitativo.</li>
         <li>Login real + comparación logueado vs anónimo para cuantificar el valor del programa de fidelidad de cada plataforma.</li>
+        <li>Expandir a 50+ zonas para significancia estadística en análisis geográfico.</li>
       </ol>
     </div>
   </section>
 
   <footer>
     <strong>Metodología:</strong> Datos recolectados mediante scraping web ético (robots.txt respetado,
-    rate limiting 1.5s entre requests, user-agent Chrome desktop) en {snapshot_date}.
+    rate limiting 1.5s entre requests, user-agent Chrome desktop) en {s['snapshot_date']}.
     Plataformas: Rappi MX, Uber Eats MX, DiDi Food MX.
-    Zonas: Polanco, Roma Norte, Del Valle, Iztapalapa, Santa Fe, Cuautitlán Izcalli (CDMX + EdoMex).
+    {len(s['zones'])} zonas analizadas: {', '.join(s['zones'])}.
     SKUs: Big Mac, McNuggets 10pz, Combo Big Mac med., Coca-Cola 500ml, Agua 1L.
     Sin login — oferta de usuario anónimo únicamente.<br>
     <span style="margin-top:6px;display:block;">
@@ -1018,7 +1084,7 @@ def main():
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_PATH.write_text(html, encoding="utf-8")
     size_kb = OUTPUT_PATH.stat().st_size / 1024
-    print(f"Report written → {OUTPUT_PATH} ({size_kb:.0f} KB)")
+    print(f"Report written: {OUTPUT_PATH} ({size_kb:.0f} KB)")
 
 
 if __name__ == "__main__":
