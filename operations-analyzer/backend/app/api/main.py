@@ -1,0 +1,92 @@
+import json
+import logging
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Query, Request
+from fastapi.responses import Response, PlainTextResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from sse_starlette.sse import EventSourceResponse
+
+from app.config import settings
+from app.data.loader import load_data
+from app.data.repository import Repository
+from app.chat.service import ChatService
+from app.api.schemas import ChatRequest, ResetRequest
+from app.insights.reporter import generate_markdown_report
+from app.insights.pdf import markdown_to_pdf_bytes
+
+logging.basicConfig(level=settings.log_level)
+log = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    log.info("Loading data...")
+    metrics_df, orders_df = load_data(settings.data_path, settings.cache_path)
+    app.state.repo = Repository(metrics_df, orders_df)
+    app.state.chat = ChatService(app.state.repo)
+    log.info("Data loaded: metrics=%s orders=%s", metrics_df.shape, orders_df.shape)
+    if not settings.use_mock_llm and not settings.openai_api_key:
+        log.warning("OPENAI_API_KEY not set; chat will fail. "
+                    "Set USE_MOCK_LLM=true to use mock responses.")
+    yield
+
+
+app = FastAPI(title="Operations Analyzer API", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    log.exception("Unhandled exception")
+    return JSONResponse(status_code=500,
+                        content={"error": str(exc), "type": type(exc).__name__})
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
+@app.get("/stats")
+def stats(request: Request):
+    repo: Repository = request.app.state.repo
+    return {
+        "countries": repo.list_countries(),
+        "zones_count": len(repo.list_zones()),
+        "metrics": repo.list_metrics(),
+    }
+
+
+@app.post("/chat")
+async def chat(req: ChatRequest, request: Request):
+    chat_service: ChatService = request.app.state.chat
+
+    async def event_gen():
+        async for ev in chat_service.chat_stream(req.session_id, req.message):
+            yield {"data": json.dumps(ev, ensure_ascii=False)}
+
+    return EventSourceResponse(event_gen())
+
+
+@app.post("/report")
+async def report(request: Request, format: str = Query("pdf")):
+    repo: Repository = request.app.state.repo
+    md_text = await generate_markdown_report(repo)
+    if format == "markdown":
+        return PlainTextResponse(md_text, media_type="text/markdown; charset=utf-8")
+    pdf = markdown_to_pdf_bytes(md_text)
+    return Response(
+        content=pdf, media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="rappi-insights.pdf"'},
+    )
+
+
+@app.post("/chat/reset")
+def chat_reset(req: ResetRequest, request: Request):
+    request.app.state.chat.reset(req.session_id)
+    return {"ok": True}
