@@ -62,12 +62,10 @@ class ChatService:
         history[:] = history[-MAX_HISTORY_MESSAGES:]
         messages = [self._system] + history
         tools_used: list[str] = []
-        client = self.llm.client  # AsyncOpenAI
 
         for iteration in range(MAX_TOOL_ITERATIONS):
-            resp = await client.chat.completions.create(
-                model=self.llm.model, messages=messages,
-                tools=TOOL_SCHEMAS, tool_choice="auto",
+            resp = await self.llm.chat(
+                messages=messages, tools=TOOL_SCHEMAS, tool_choice="auto",
             )
             choice = resp.choices[0]
             msg = choice.message
@@ -95,8 +93,7 @@ class ChatService:
                 continue
             # No more tool calls → final answer
             final_text = msg.content or ""
-            for ch in final_text:
-                yield {"type": "token", "content": ch}
+            yield {"type": "token", "content": final_text}
             history.append({"role": "assistant", "content": final_text})
             suggestions = await self._suggest_followups(user_msg, tools_used)
             yield {"type": "done", "sources": tools_used,
@@ -109,8 +106,7 @@ class ChatService:
 
     async def _suggest_followups(self, last_q: str, tools: list[str]) -> list[str]:
         try:
-            resp = await self.llm.client.chat.completions.create(
-                model=self.llm.model,
+            resp = await self.llm.chat(
                 messages=[
                     {"role": "system",
                      "content": "Devolvé JSON con sugerencias de follow-up."},

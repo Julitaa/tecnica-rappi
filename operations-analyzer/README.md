@@ -53,16 +53,16 @@ Resumen:
 
 ## Decisiones técnicas y trade-offs
 
-| Decisión | Razón |
-|---|---|
-| OpenAI gpt-4o vs open-source | Tool-calling estable + demo en vivo confiable. Costo bajo (~$0.20/sesión). Arquitectura LLM-agnostic vía wrapper. |
-| pandas in-memory + DuckDB vs SQLite/Postgres | Dataset chico (~14k filas), zero-setup, DuckDB da SQL real sobre DataFrames sin DB externa. |
-| Toolbox + SQL fallback vs text-to-pandas | Toolbox cubre los casos del brief con precisión + SQL fallback con whitelist sqlglot es más seguro y estándar que pandas arbitrario. |
+|  Decisión                                         |  Razón                        |
+|    ---                                            |   ---                         |
+| OpenAI gpt-4o vs open-source                      | Tool-calling estable + demo en vivo confiable. Costo bajo. Arquitectura LLM-agnostic vía wrapper. |
+| pandas in-memory + DuckDB vs SQLite/Postgres      | Dataset chico (~14k filas), zero-setup, DuckDB da SQL real sobre DataFrames sin DB externa. |
+| Toolbox + SQL fallback vs text-to-pandas          | Toolbox cubre los casos del brief con precisión + SQL fallback con whitelist sqlglot es más seguro y estándar que pandas arbitrario. |
 | Determinístico para insights + LLM para narrativa | Cero alucinación de números, evidencia trazable, narrativa fluida. |
 
 ## Costo estimado
 
-- Sesión de 10 preguntas en el chat: ~$0.10-0.20 (gpt-4o).
+- Sesión de 10 preguntas en el chat: ~$0.10 (gpt-4o).
 - Generación de un reporte: ~$0.05-0.10.
 - Desarrollo + demo: <$5.
 

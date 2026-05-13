@@ -12,7 +12,7 @@ export function MessageBubble({ msg }: { msg: Message }) {
           ? "bg-rappi text-white"
           : "bg-gray-100 text-gray-900 border border-gray-200"
       }`}>
-        <div className="prose prose-sm max-w-none">
+        <div className={`prose prose-sm max-w-none ${isUser ? "prose-invert text-white [&_*]:text-white" : ""}`}>
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
         </div>
         {msg.toolsUsed && msg.toolsUsed.length > 0 && (

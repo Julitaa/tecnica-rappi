@@ -21,6 +21,7 @@ export async function* streamChat(
     const { done, value } = await reader.read();
     if (done) break;
     buf += decoder.decode(value, { stream: true });
+    buf = buf.replaceAll("\r\n", "\n").replaceAll("\r", "\n");
     const parts = buf.split("\n\n");
     buf = parts.pop() ?? "";
     for (const part of parts) {

@@ -1,10 +1,10 @@
 """Markdown → HTML → PDF with Rappi branding."""
+import io
 import markdown as md
-from weasyprint import HTML
+from xhtml2pdf import pisa
 
 CSS = """
-@page { size: A4; margin: 2cm 1.5cm; }
-body { font-family: 'Helvetica', 'Arial', sans-serif; color: #1A1A1A; font-size: 11pt; line-height: 1.5; }
+body { font-family: Helvetica, Arial, sans-serif; color: #1A1A1A; font-size: 11pt; line-height: 1.5; }
 h1 { color: #FF441F; border-bottom: 3px solid #FF441F; padding-bottom: 6px; }
 h2 { color: #FF441F; margin-top: 24px; }
 h3 { color: #333; margin-top: 16px; }
@@ -22,4 +22,6 @@ def markdown_to_pdf_bytes(markdown_text: str) -> bytes:
     html_body = md.markdown(markdown_text, extensions=["tables", "fenced_code"])
     full_html = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>{CSS}</style></head><body>{html_body}</body></html>"""
-    return HTML(string=full_html).write_pdf()
+    buf = io.BytesIO()
+    pisa.CreatePDF(full_html, dest=buf)
+    return buf.getvalue()

@@ -39,17 +39,19 @@ class LLMClient:
         messages: list[dict],
         tools: list[dict] | None = None,
         stream: bool = False,
+        **kwargs: Any,
     ) -> Any:
         if self.mock:
             return self._mock_completion()
-        kwargs: dict[str, Any] = {
+        params: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
             "stream": stream,
         }
         if tools:
-            kwargs["tools"] = tools
-        return await self._client.chat.completions.create(**kwargs)
+            params["tools"] = tools
+        params.update(kwargs)
+        return await self._client.chat.completions.create(**params)
 
     async def chat_stream(
         self,

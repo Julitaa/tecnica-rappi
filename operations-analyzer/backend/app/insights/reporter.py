@@ -2,6 +2,7 @@
 from __future__ import annotations
 import json
 import logging
+import numpy as np
 from app.data.repository import Repository
 from app.data.glossary import GLOSSARY, glossary_for_prompt
 from app.insights.detector import (
@@ -13,6 +14,15 @@ from app.insights.prompts import REPORTER_SYSTEM
 from app.llm.client import get_llm
 
 log = logging.getLogger(__name__)
+
+
+class _NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (np.integer,)): return int(obj)
+        if isinstance(obj, (np.floating,)): return float(obj)
+        if isinstance(obj, np.bool_): return bool(obj)
+        if isinstance(obj, np.ndarray): return obj.tolist()
+        return super().default(obj)
 
 
 def collect_findings(repo: Repository) -> list[dict]:
@@ -37,7 +47,7 @@ async def generate_markdown_report(repo: Repository) -> str:
     }
     messages = [
         {"role": "system", "content": REPORTER_SYSTEM},
-        {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)},
+        {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False, cls=_NumpyEncoder)},
     ]
     resp = await llm.chat(messages)
     return resp.choices[0].message.content or ""

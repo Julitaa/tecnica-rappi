@@ -1,26 +1,16 @@
 "use client";
-import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
-import { fetchReportMarkdown, reportPdfUrl } from "@/lib/api-client";
+import { reportPdfUrl } from "@/lib/api-client";
 
-export function ReportPanel() {
-  const [md, setMd] = useState<string>("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+interface ReportPanelProps {
+  markdown: string;
+  onRegenerate: () => void;
+  isRegenerating: boolean;
+}
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    fetchReportMarkdown()
-      .then((text) => { if (!cancelled) setMd(text); })
-      .catch((e) => { if (!cancelled) setError(String(e)); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, []);
-
+export function ReportPanel({ markdown, onRegenerate, isRegenerating }: ReportPanelProps) {
   const downloadPdf = async () => {
     const res = await fetch(reportPdfUrl(), { method: "POST" });
     const blob = await res.blob();
@@ -35,20 +25,16 @@ export function ReportPanel() {
   };
 
   return (
-    <div className="p-6">
+    <div className="h-full">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-bold text-rappi">Reporte Ejecutivo</h2>
-        <Button onClick={downloadPdf} className="bg-rappi hover:bg-rappi/90" disabled={loading || !!error}>
+        <Button onClick={downloadPdf} className="bg-rappi hover:bg-rappi/90 text-white" disabled={isRegenerating}>
           Descargar PDF
         </Button>
       </div>
-      {loading && <p className="text-gray-500">Generando reporte... (esto puede tardar 20-40 segundos)</p>}
-      {error && <p className="text-red-600">Error: {error}</p>}
-      {!loading && !error && (
-        <article className="prose prose-sm max-w-none">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{md}</ReactMarkdown>
-        </article>
-      )}
+      <article className="prose prose-sm max-w-none">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown>
+      </article>
     </div>
   );
 }
