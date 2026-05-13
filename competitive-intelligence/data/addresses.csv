@@ -5,3 +5,17 @@ address_id,label,street,lat,lng,zone_type
 4,Iztapalapa,Av. Ermita Iztapalapa 1000,19.3593,-99.0817,periferia
 5,Santa Fe,Av. Vasco de Quiroga 3800,19.3597,-99.2730,corporativo
 6,Cuautitlan Izcalli,Av. Jimenez Cantu,19.6469,-99.2058,edomex
+7,Centro Historico,Av. Juarez 16,19.4358,-99.1440,historico
+8,Coyoacan,Av. Miguel Angel de Quevedo 687,19.3491,-99.1633,cultural
+9,Ecatepec,Av. Central Poniente 100,19.6018,-99.0261,edomex_popular
+10,Insurgentes Sur,Av. Insurgentes Sur 3000,19.3249,-99.1739,residencial_sur
+11,Huixquilucan,Paseo de la República 500,19.3768,-99.3155,premium_suburbano
+12,Cuajimalpa,Av. Vasco de Quiroga 2000,19.3612,-99.3248,premium_bosque
+13,Gustavo A. Madero,Av. 100 Años 2000,19.4916,-99.1037,popular_noreste
+14,Azcapotzalco,Av. Azcapotzalco 800,19.4796,-99.1554,industrial
+15,Alvaro Obregon,Av. Patriotismo 550,19.4025,-99.2050,residencial_poniente
+16,Tlalpan,Calz. de Tlalpan 6000,19.2760,-99.1610,sur_residencial
+17,Xochimilco,Av. Central 100,19.2660,-99.0968,sur_tradicional
+18,Naucalpan,Av. México 1000,19.4880,-99.2300,edomex_corporativo
+19,Atizapan,Av. Mariano Escobedo 500,19.5508,-99.2287,edomex_poniente
+20,Toluca,Av. Solidaridad 1000,19.2899,-99.6569,edomex_capital

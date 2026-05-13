@@ -7,7 +7,6 @@ venv/
 .pytest_cache/
 probe_output/
 evidencia/
-report/competitive_intelligence_2026.html
 scripts/*
 !scripts/build_notebook.py
 !scripts/merge_scrapes.py
