@@ -9,7 +9,7 @@ Bot conversacional + sistema de insights automáticos sobre métricas operaciona
 
 ## Stack
 
-- Backend: Python 3.11, FastAPI, pandas, DuckDB, OpenAI gpt-4o, weasyprint, sqlglot.
+- Backend: Python 3.11, FastAPI, pandas, DuckDB, OpenAI gpt-4o, sqlglot.
 - Frontend: Next.js 14 (App Router), TypeScript, Tailwind, shadcn/ui.
 
 ## Cómo correrlo local

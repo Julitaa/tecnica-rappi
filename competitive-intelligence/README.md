@@ -43,11 +43,6 @@ python report/generate_report.py
 Output: report/competitive_intelligence_2026.html
 ```
 
-**Notebook exploratorio**:
-```bash
-jupyter notebook notebooks/insights.ipynb
-```
-
 ---
 
 ## Cobertura geográfica
