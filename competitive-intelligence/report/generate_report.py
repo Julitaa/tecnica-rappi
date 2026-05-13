@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
 Competitive Intelligence HTML Report Generator.
-Reads ../scrapes.csv and writes competitive_intelligence_2026.html.
+Reads ../data/scrapes.csv and writes competitive_intelligence_2026.html.
 Run from any directory: python -m report.generate_report
 """
 import pathlib
-import json
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.io as pio
@@ -37,11 +36,11 @@ INSIGHTS = [
         "recomendacion": "Auditar capacidad de riders en las 5 zonas con mayor brecha (Alvaro Obregón 24 min gap, Insurgentes Sur 22 min, Gustavo A. Madero 24 min, Cuautitlán 25 min, Iztapalapa 21 min). Replicar el playbook de Roma Norte y Santa Fe (incentivos + zonas calientes geofenced). Meta: reducir brecha media a <15 min en 90 días.",
     },
     {
-        "title": "Paridad de precio fast food + descuento silencioso: Rappi da el mismo valor pero pierde la narrativa",
+        "title": "Precio combo con variabilidad geográfica en Rappi: $169–$218 vs precio único $169 en Uber Eats",
         "urgency": "high",
-        "finding": "Precio de producto idéntico entre Rappi y Uber Eats: Big Mac ~$130, McNuggets ~$138, Combo ~$169–185 MXN. Rappi aplica un delivery fee de ~$10 MXN y luego un descuento de ~-$10 MXN (resultado neto: $0). Uber Eats cobra $0 directo. Uber Eats comunica promos en el 80% del menú ('envío gratis usuarios nuevos'); Rappi en 0%.",
-        "impact": "Rappi está dando el mismo beneficio económico que Uber Eats y cediendo todo el crédito psicológico. Uber Eats convierte cada visita al menú en un call-to-action de adquisición. Rappi lo desperdicia.",
-        "recomendacion": "Convertir el discount_mxn actual en copy visible ('¡Envío gratis para vos!') con A/B test vs. estado actual. Hipótesis: lift de conversión del 5–10% en first-order sin costo incremental.",
+        "finding": "Big Mac y McNuggets tienen paridad exacta en ambas plataformas. Sin embargo el Combo Big Mac med. muestra precios de $208–$218 MXN en al menos 4 zonas de Rappi (Atizapan, Coyoacan, Del Valle, Naucalpan) vs precio fijo $169 MXN en Uber Eats. La media de Rappi sube a ~$184 MXN por efecto de estas zonas.",
+        "impact": "Un usuario que pide el combo en Coyoacan o Naucalpan paga hasta 29% más en Rappi que en UE por el mismo producto. Si esto no responde a un acuerdo tarifario local, representa un riesgo de abandono en esas zonas.",
+        "recomendacion": "Auditar el contrato de precios con McDonald's por zona. Si el precio diferencial no está justificado operacionalmente, homologar a $169 en todas las zonas. Alternativamente, comunicar explícitamente la razón del diferencial (logística, costo local).",
     },
     {
         "title": "Rappi lidera en precio retail (OXXO): $22 Coca-Cola vs $24.50 de UberEats — ventaja no comunicada",
@@ -51,11 +50,11 @@ INSIGHTS = [
         "recomendacion": "Campaña de precio en retail: banner 'OXXO más barato en Rappi' con comparativa directa. A/B test en home con cross-sell post-pedido restaurante ('Agregá snacks de OXXO'). Medir uplift en AOV y frecuencia de pedidos mixtos.",
     },
     {
-        "title": "Roma Norte y Santa Fe como blueprint replicable: Rappi puede empatar a UberEats en ETA",
+        "title": "Descuento silencioso en fast food: Rappi da el mismo valor que UE pero pierde la narrativa",
         "urgency": "med",
-        "finding": "Roma Norte (12 min) y Santa Fe (12 min) son las 2 zonas donde Rappi empata con Uber Eats en velocidad de entrega. Ambas zonas tienen alta densidad de repartidores histórica. El resto de las zonas (16/18) muestra brechas significativas, lo que confirma que el problema es de ejecución, no estructural.",
-        "impact": "Existe evidencia empírica de que Rappi puede competir operacionalmente con UberEats — no es un techo de plataforma, es una decisión de inversión por zona.",
-        "recomendacion": "Documentar el modelo Roma Norte / Santa Fe (densidad riders/km², incentivos, geofencing activo) y aplicarlo como experimento controlado en 2–3 zonas con mayor brecha (Alvaro Obregón, Insurgentes Sur). KPI: ETA mediano <20 min en 60 días.",
+        "finding": "Rappi aplica un delivery fee variable (~$0–$45 MXN) con un descuento equivalente — resultado neto: $0 para el usuario. Uber Eats expone directamente $0. Uber Eats comunica promos en el 80% del menú McDonald's visitado ('envío gratis usuarios nuevos'); Rappi en 0%.",
+        "impact": "Rappi está dando el mismo beneficio económico que Uber Eats y cediendo todo el crédito psicológico. Uber Eats convierte cada visita al menú en un call-to-action de adquisición. Rappi lo desperdicia.",
+        "recomendacion": "Convertir el discount_mxn actual en copy visible ('¡Envío gratis para vos!') con A/B test vs. estado actual. Hipótesis: lift de conversión del 5–10% en first-order sin costo incremental.",
     },
     {
         "title": "DiDi Food es invisible en web CDMX — ventana para blindaje preventivo",
@@ -174,7 +173,9 @@ def _css() -> str:
         font-size: 15px;
         font-weight: 600;
         color: #374151;
-        margin: 24px 0 10px;
+        margin: 28px 0 10px;
+        padding-left: 10px;
+        border-left: 3px solid #FF441F;
     }
     .section-number {
         display: inline-block;
@@ -307,7 +308,7 @@ def _css() -> str:
     .limitations ul { padding-left: 20px; }
     .limitations li { font-size: 13px; line-height: 1.7; color: #6B7280; }
     .next-steps { margin-top: 20px; }
-    .next-steps h3 { color: #374151; font-size: 14px; margin-bottom: 8px; }
+    .next-steps h3 { color: #374151; font-size: 14px; margin-bottom: 8px; padding-left: 0; border-left: none; margin-top: 0; }
     .next-steps ol { padding-left: 20px; }
     .next-steps li { font-size: 13px; line-height: 1.7; color: #374151; }
 
@@ -334,14 +335,13 @@ def _css() -> str:
 
 
 def _fig_div(fig: go.Figure, div_id: str) -> str:
-    """Serialize a Plotly figure to an embeddable HTML div."""
     return pio.to_html(fig, full_html=False, include_plotlyjs=False, div_id=div_id)
 
 
 def _promo_table_html(df: pd.DataFrame, brand_id: str = None) -> str:
     sub = df if brand_id is None else df[df["brand_id"] == brand_id]
     rows = []
-    for platform in ["rappi", "ubereats", "didi"]:
+    for platform in ["rappi", "ubereats"]:
         texts = (
             sub[(sub["platform"] == platform) & sub["has_promo"]]
             ["promo_text"].dropna().unique()
@@ -369,20 +369,27 @@ def _exec_summary_html(df: pd.DataFrame, stats: dict) -> str:
     didi_count  = stats["n_didi_avail"]
 
     rows = [
-        (f"🍔 Fast Food — Precios",
-         f"Paridad exacta: Big Mac ~${stats['ff_price_bigmac_rappi']:.0f} (Rappi) vs ~${stats['ff_price_bigmac_ue']:.0f} (UE). Sin diferenciación en precio de producto.",
-         "badge-yellow", "Paridad"),
-        (f"🍔 Fast Food — ETA",
-         f"Rappi {stats['ff_eta_rappi_min']}–{stats['ff_eta_rappi_max']} min vs UberEats {stats['ff_eta_ue_min']}–{stats['ff_eta_ue_max']} min. Rappi solo empata en Roma Norte y Santa Fe (12 min).",
+        ("🍔 Precios Fast Food",
+         f"Paridad en Big Mac (~${stats['ff_price_bigmac_rappi']:.0f}) y McNuggets (~${stats['ff_price_nuggets_rappi']:.0f}). "
+         f"Combo varía en Rappi: ${stats['ff_combo_min_rappi']:.0f}–${stats['ff_combo_max_rappi']:.0f} vs precio fijo ${stats['ff_price_combo_ue']:.0f} en UE.",
+         "badge-yellow", "Variabilidad en combo"),
+        ("🕒 Tiempos de entrega",
+         f"Rappi {stats['ff_eta_rappi_min']}–{stats['ff_eta_rappi_max']} min vs UberEats {stats['ff_eta_ue_min']}–{stats['ff_eta_ue_max']} min. "
+         f"Rappi empata solo en Roma Norte y Santa Fe (12 min).",
          "badge-red", "Desventaja"),
-        (f"🍔 Fast Food — Fees",
-         f"Mismo ticket neto. Rappi fee ${stats['ff_delivery_rappi']:.0f} + descuento ${stats['ff_discount_rappi']:.0f} = $0. UE $0 directo. UE gana la narrativa: '{stats['ff_promo_pct_ue']:.0f}% filas con promo visible' vs Rappi {stats['ff_promo_pct_rappi']:.0f}%.",
+        ("🛵 Costos de entrega",
+         f"Rappi cobra delivery fee (~${stats['ff_delivery_rappi']:.0f} promedio) y luego aplica descuento equivalente — neto $0. "
+         f"UE cobra $0 directamente. Mismo costo, UE mejor narrativa.",
          "badge-yellow", "Desventaja narrativa"),
-        (f"🛒 Retail (OXXO) — Precios",
-         f"Rappi más barato: Coca-Cola ${stats['rt_price_coca_rappi']:.1f} vs UE ${stats['rt_price_coca_ue']:.1f} (+{((stats['rt_price_coca_ue']/stats['rt_price_coca_rappi'])-1)*100:.0f}%). Agua ${stats['rt_price_agua_rappi']:.1f} vs UE ${stats['rt_price_agua_ue']:.1f} (+{((stats['rt_price_agua_ue']/stats['rt_price_agua_rappi'])-1)*100:.0f}%).",
+        ("🛒 Precios Retail (OXXO)",
+         f"Rappi más barato: Coca-Cola ${stats['rt_price_coca_rappi']:.1f} vs UE ${stats['rt_price_coca_ue']:.1f} "
+         f"(+{((stats['rt_price_coca_ue']/stats['rt_price_coca_rappi'])-1)*100:.0f}%). "
+         f"Agua ${stats['rt_price_agua_rappi']:.1f} vs UE ${stats['rt_price_agua_ue']:.1f} "
+         f"(+{((stats['rt_price_agua_ue']/stats['rt_price_agua_rappi'])-1)*100:.0f}%). Ventaja no comunicada.",
          "badge-green", "Ventaja precio"),
-        (f"🛒 Retail (OXXO) — Cobertura",
-         f"Rappi {stats['rt_avail_rappi']}/{stats['rt_total_rappi']} zonas disponibles. UberEats {stats['rt_avail_ue']}/{stats['rt_total_ue']}. Rappi lidera en disponibilidad y precio — ventaja no comunicada.",
+        ("🛒 Cobertura Retail (OXXO)",
+         f"Rappi {stats['rt_avail_rappi']}/{stats['rt_total_rappi']} zonas. UberEats {stats['rt_avail_ue']}/{stats['rt_total_ue']}. "
+         f"Rappi lidera en precio Y cobertura — mayor oportunidad sin explotar.",
          "badge-green", "Ventaja cobertura"),
     ]
     header = (
@@ -445,14 +452,13 @@ def load_data() -> pd.DataFrame:
 
 
 def compute_stats(df: pd.DataFrame) -> dict:
-    """Compute all dynamic metrics used in narrative text."""
     av = df[df["available"] == True]
     ff = av[av["brand_id"] == "mcdonalds"]
     rt = av[av["brand_id"] == "oxxo"]
     df_rt_all = df[df["brand_id"] == "oxxo"]
 
-    def _eta_range(sub, platform):
-        vals = sub[sub["platform"] == platform]["eta_min"].dropna()
+    def _eta_range(platform):
+        vals = ff[ff["platform"] == platform]["eta_min"].dropna()
         return (int(vals.min()), int(vals.max())) if len(vals) else (None, None)
 
     def _avg_price(sub, platform, sku):
@@ -461,46 +467,51 @@ def compute_stats(df: pd.DataFrame) -> dict:
 
     def _promo_pct(sub, platform):
         sub2 = sub[sub["platform"] == platform]
-        if len(sub2) == 0:
-            return 0
-        return round(sub2["has_promo"].mean() * 100, 0)
+        return round(sub2["has_promo"].mean() * 100, 0) if len(sub2) else 0
 
-    ff_eta_rappi = _eta_range(ff, "rappi")
-    ff_eta_ue    = _eta_range(ff, "ubereats")
+    def _eta_range_brand(brand, platform):
+        vals = av[(av["brand_id"] == brand) & (av["platform"] == platform) &
+                  av["eta_min"].notna() & (av["eta_min"] > 0)]["eta_min"]
+        return (int(vals.min()), int(vals.max()), int(len(vals))) if len(vals) else (None, None, 0)
 
-    ff_rappi_fees = ff[ff["platform"] == "rappi"]
-    ff_delivery_rappi = round(ff_rappi_fees["delivery_fee_mxn"].mean(), 1) if len(ff_rappi_fees) else 0
-    ff_discount_rappi = round(ff_rappi_fees["discount_mxn"].mean(), 1) if len(ff_rappi_fees) else 0
+    ff_eta_rappi = _eta_range("rappi")
+    ff_eta_ue    = _eta_range("ubereats")
+    rt_eta_rappi = _eta_range_brand("oxxo", "rappi")
+    rt_eta_ue    = _eta_range_brand("oxxo", "ubereats")
 
-    def _price_range(sub, platform, sku):
-        vals = sub[(sub["platform"] == platform) & (sub["product_sku"] == sku)]["unit_price_mxn"].dropna()
-        if len(vals) == 0:
-            return (None, None)
-        return (round(vals.min(), 1), round(vals.max(), 1))
+    ff_rappi = ff[ff["platform"] == "rappi"]
+    ff_delivery_rappi = round(ff_rappi["delivery_fee_mxn"].mean(), 1) if len(ff_rappi) else 0
+
+    combo_rappi = ff[(ff["platform"] == "rappi") & (ff["product_sku"] == "mcombo_bigmac_med")]["unit_price_mxn"].dropna()
 
     return {
         "ff_eta_rappi_min": ff_eta_rappi[0],
         "ff_eta_rappi_max": ff_eta_rappi[1],
         "ff_eta_ue_min":    ff_eta_ue[0],
         "ff_eta_ue_max":    ff_eta_ue[1],
+        "rt_eta_rappi_min": rt_eta_rappi[0],
+        "rt_eta_rappi_max": rt_eta_rappi[1],
+        "rt_eta_rappi_n":   rt_eta_rappi[2],
+        "rt_eta_ue_min":    rt_eta_ue[0],
+        "rt_eta_ue_max":    rt_eta_ue[1],
+        "rt_eta_ue_n":      rt_eta_ue[2],
         "ff_price_bigmac_rappi":  _avg_price(ff, "rappi", "big_mac"),
         "ff_price_bigmac_ue":     _avg_price(ff, "ubereats", "big_mac"),
         "ff_price_nuggets_rappi": _avg_price(ff, "rappi", "mcnuggets_10"),
         "ff_price_nuggets_ue":    _avg_price(ff, "ubereats", "mcnuggets_10"),
         "ff_price_combo_rappi":   _avg_price(ff, "rappi", "mcombo_bigmac_med"),
         "ff_price_combo_ue":      _avg_price(ff, "ubereats", "mcombo_bigmac_med"),
+        "ff_combo_min_rappi":     round(combo_rappi.min(), 0) if len(combo_rappi) else 0,
+        "ff_combo_max_rappi":     round(combo_rappi.max(), 0) if len(combo_rappi) else 0,
         "ff_delivery_rappi": ff_delivery_rappi,
-        "ff_discount_rappi": ff_discount_rappi,
         "ff_promo_pct_rappi": _promo_pct(ff, "rappi"),
         "ff_promo_pct_ue":    _promo_pct(ff, "ubereats"),
         "rt_promo_pct_rappi": _promo_pct(rt, "rappi"),
         "rt_promo_pct_ue":    _promo_pct(rt, "ubereats"),
-        "rt_price_coca_rappi":       _avg_price(rt, "rappi", "cocacola_500ml"),
-        "rt_price_coca_ue":          _avg_price(rt, "ubereats", "cocacola_500ml"),
-        "rt_price_agua_rappi":       _avg_price(rt, "rappi", "agua_1l"),
-        "rt_price_agua_ue":          _avg_price(rt, "ubereats", "agua_1l"),
-        "rt_price_coca_rappi_range": _price_range(rt, "rappi", "cocacola_500ml"),
-        "rt_price_agua_rappi_range": _price_range(rt, "rappi", "agua_1l"),
+        "rt_price_coca_rappi": _avg_price(rt, "rappi", "cocacola_500ml"),
+        "rt_price_coca_ue":    _avg_price(rt, "ubereats", "cocacola_500ml"),
+        "rt_price_agua_rappi": _avg_price(rt, "rappi", "agua_1l"),
+        "rt_price_agua_ue":    _avg_price(rt, "ubereats", "agua_1l"),
         "rt_avail_rappi": int(len(df_rt_all[(df_rt_all["platform"] == "rappi") & (df_rt_all["available"] == True)])),
         "rt_total_rappi": int(len(df_rt_all[df_rt_all["platform"] == "rappi"])),
         "rt_avail_ue":    int(len(df_rt_all[(df_rt_all["platform"] == "ubereats") & (df_rt_all["available"] == True)])),
@@ -515,17 +526,19 @@ def compute_stats(df: pd.DataFrame) -> dict:
     }
 
 
-def make_price_chart(df: pd.DataFrame) -> go.Figure:
-    """Bar chart: unit price by SKU × platform (fast food only, available rows)."""
+# ── SECTION 1: PRECIOS ────────────────────────────────────────────────────────
+
+def make_ff_price_chart(df: pd.DataFrame) -> go.Figure:
+    """Bar chart: unit price by SKU × platform for Big Mac and McNuggets (uniform across zones)."""
     av = df[(df["available"] == True) & (df["brand_id"] == "mcdonalds")]
-    fast_food_skus = ["big_mac", "mcnuggets_10", "mcombo_bigmac_med"]
+    skus = ["big_mac", "mcnuggets_10"]
 
     fig = go.Figure()
     for platform in ["rappi", "ubereats"]:
         pdata = av[av["platform"] == platform]
         prices = pdata.groupby("product_sku")["unit_price_mxn"].mean()
-        x_labels = [SKU_LABELS[s] for s in fast_food_skus if s in prices.index]
-        y_vals = [prices[s] for s in fast_food_skus if s in prices.index]
+        x_labels = [SKU_LABELS[s] for s in skus if s in prices.index]
+        y_vals = [prices[s] for s in skus if s in prices.index]
         fig.add_trace(go.Bar(
             name=PLATFORM_LABELS[platform],
             x=x_labels,
@@ -538,133 +551,35 @@ def make_price_chart(df: pd.DataFrame) -> go.Figure:
     fig.update_layout(
         barmode="group",
         template="plotly_white",
-        height=340,
+        height=320,
         margin=dict(l=20, r=20, t=10, b=40),
-        yaxis_title="MXN",
+        yaxis=dict(title="MXN", range=[0, 200]),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         font=dict(family="Inter, system-ui, sans-serif", size=12),
     )
     return fig
 
 
-def make_eta_chart(df: pd.DataFrame) -> go.Figure:
-    """Heatmap: average ETA by zone × platform. Darker = faster."""
-    av = df[(df["available"] == True) & df["eta_min"].notna()]
-    pivot = (
-        av.groupby(["address_label", "platform"])["eta_min"]
+def make_combo_by_zone_chart(df: pd.DataFrame) -> go.Figure:
+    """Grouped bar: Combo Big Mac price per zone × platform to expose Rappi price variability."""
+    ff = df[(df["available"] == True) & (df["brand_id"] == "mcdonalds") &
+            (df["product_sku"] == "mcombo_bigmac_med")]
+    geo = (
+        ff.groupby(["address_label", "platform"])["unit_price_mxn"]
         .mean()
         .round(0)
         .unstack("platform")
-        .reindex(columns=["rappi", "ubereats", "didi"])
-        .dropna(axis=1, how="all")
     )
-
-    z = pivot.values
-    text = [[f"{v:.0f}" if not pd.isna(v) else "N/D" for v in row] for row in z]
-
-    fig = go.Figure(data=go.Heatmap(
-        z=z,
-        x=[PLATFORM_LABELS.get(c, c) for c in pivot.columns],
-        y=list(pivot.index),
-        colorscale="YlOrRd_r",
-        text=text,
-        texttemplate="%{text} min",
-        showscale=True,
-        colorbar=dict(title="min", thickness=12),
-    ))
-    fig.update_layout(
-        template="plotly_white",
-        height=300,
-        margin=dict(l=20, r=20, t=10, b=20),
-        font=dict(family="Inter, system-ui, sans-serif", size=12),
-    )
-    return fig
-
-
-def make_fees_chart(df: pd.DataFrame) -> go.Figure:
-    """Stacked bar: average ticket composition by platform."""
-    av = df[(df["available"] == True) & df["unit_price_mxn"].notna()]
-    fee_cols = ["unit_price_mxn", "delivery_fee_mxn", "service_fee_mxn", "discount_mxn"]
-    fees = av.groupby("platform")[fee_cols].mean().round(1)
-
-    fee_labels = {
-        "unit_price_mxn": "Precio producto",
-        "delivery_fee_mxn": "Delivery fee",
-        "service_fee_mxn": "Service fee",
-        "discount_mxn": "Descuento",
-    }
-    fee_colors = ["#4C72B0", "#DD8452", "#937860", "#C44E52"]
-
-    fig = go.Figure()
-    for col, color in zip(fee_cols, fee_colors):
-        fig.add_trace(go.Bar(
-            name=fee_labels[col],
-            x=[PLATFORM_LABELS.get(p, p) for p in fees.index],
-            y=fees[col].tolist(),
-            marker_color=color,
-        ))
-
-    totals = av.groupby("platform")["total_final_mxn"].mean().round(1)
-    for i, platform in enumerate(fees.index):
-        if platform in totals.index:
-            fig.add_annotation(
-                x=PLATFORM_LABELS.get(platform, platform),
-                y=totals[platform] + 5,
-                text=f"<b>Total: ${totals[platform]:.0f}</b>",
-                showarrow=False,
-                font=dict(size=11),
-            )
-
-    fig.update_layout(
-        barmode="stack",
-        template="plotly_white",
-        height=350,
-        margin=dict(l=20, r=20, t=30, b=40),
-        yaxis_title="MXN",
-        legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1),
-        font=dict(family="Inter, system-ui, sans-serif", size=12),
-    )
-    return fig
-
-
-def make_promos_chart(df: pd.DataFrame) -> go.Figure:
-    """Horizontal bar: % of rows with visible promo text, by platform."""
-    pct = df.groupby("platform")["has_promo"].mean().mul(100).round(1)
-    platforms = list(pct.index)
-
-    fig = go.Figure(go.Bar(
-        x=[PLATFORM_LABELS.get(p, p) for p in platforms],
-        y=pct.tolist(),
-        marker_color=[PLATFORM_COLORS.get(p, "#888") for p in platforms],
-        text=[f"{v:.0f}%" for v in pct],
-        textposition="outside",
-    ))
-    fig.update_layout(
-        template="plotly_white",
-        height=280,
-        margin=dict(l=20, r=20, t=10, b=40),
-        yaxis=dict(title="%", range=[0, 120]),
-        font=dict(family="Inter, system-ui, sans-serif", size=12),
-    )
-    return fig
-
-
-def make_geo_chart(df: pd.DataFrame) -> go.Figure:
-    """Grouped bar: average total ticket by zone × platform (fast food only for apples-to-apples)."""
-    av = df[(df["available"] == True) & (df["brand_id"] == "mcdonalds") & df["total_final_mxn"].notna()]
-    geo = (
-        av.groupby(["address_label", "platform"])["total_final_mxn"]
-        .mean()
-        .round(1)
-        .unstack("platform")
-    )
+    # Sort by Rappi price descending to highlight expensive zones first
+    if "rappi" in geo.columns:
+        geo = geo.sort_values("rappi", ascending=False)
 
     fig = go.Figure()
     for platform in ["rappi", "ubereats"]:
         if platform not in geo.columns:
             continue
         y_vals = geo[platform].tolist()
-        text_vals = [f"${v:.0f}" if not pd.isna(v) else "" for v in y_vals]
+        text_vals = [f"${v:.0f}" if not pd.isna(v) else "N/D" for v in y_vals]
         fig.add_trace(go.Bar(
             name=PLATFORM_LABELS[platform],
             x=list(geo.index),
@@ -674,13 +589,17 @@ def make_geo_chart(df: pd.DataFrame) -> go.Figure:
             textposition="outside",
         ))
 
+    # Reference line at 169
+    fig.add_hline(y=169, line_dash="dot", line_color="#9CA3AF",
+                  annotation_text="$169 — precio base", annotation_position="right")
+
     fig.update_layout(
         barmode="group",
         template="plotly_white",
-        height=350,
+        height=360,
         margin=dict(l=20, r=20, t=10, b=60),
-        yaxis_title="MXN",
-        xaxis_tickangle=-20,
+        yaxis=dict(title="MXN", range=[0, 260]),
+        xaxis_tickangle=-25,
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         font=dict(family="Inter, system-ui, sans-serif", size=12),
     )
@@ -688,7 +607,7 @@ def make_geo_chart(df: pd.DataFrame) -> go.Figure:
 
 
 def make_retail_price_chart(df: pd.DataFrame) -> go.Figure:
-    """Bar chart: avg unit price by retail SKU x platform (available rows only)."""
+    """Bar chart: avg unit price by retail SKU × platform."""
     av = df[(df["available"] == True) & (df["brand_id"] == "oxxo")]
     retail_skus = ["cocacola_500ml", "agua_1l"]
 
@@ -697,7 +616,7 @@ def make_retail_price_chart(df: pd.DataFrame) -> go.Figure:
         pdata = av[av["platform"] == platform]
         prices = pdata.groupby("product_sku")["unit_price_mxn"].mean()
         x_labels = [SKU_LABELS[s] for s in retail_skus if s in prices.index]
-        y_vals   = [prices[s] for s in retail_skus if s in prices.index]
+        y_vals = [prices[s] for s in retail_skus if s in prices.index]
         if not y_vals:
             continue
         fig.add_trace(go.Bar(
@@ -714,96 +633,126 @@ def make_retail_price_chart(df: pd.DataFrame) -> go.Figure:
         template="plotly_white",
         height=320,
         margin=dict(l=20, r=20, t=10, b=40),
-        yaxis_title="MXN",
+        yaxis=dict(title="MXN", range=[0, 40]),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         font=dict(family="Inter, system-ui, sans-serif", size=12),
     )
     return fig
 
 
-def make_retail_avail_chart(df: pd.DataFrame) -> go.Figure:
-    """Heatmap: OXXO availability (1=yes, 0=no) by zone x platform."""
-    rt = df[df["brand_id"] == "oxxo"]
+# ── SECTION 2: OPERACIONAL ────────────────────────────────────────────────────
+
+def make_eta_chart(df: pd.DataFrame, brand_id: str = "mcdonalds") -> go.Figure:
+    """Horizontal grouped bar: ETA by zone × platform. Only rows with eta_min > 0."""
+    sub = df[(df["available"] == True) & (df["brand_id"] == brand_id) &
+             df["eta_min"].notna() & (df["eta_min"] > 0)]
     pivot = (
-        rt.groupby(["address_label", "platform"])["available"]
+        sub.groupby(["address_label", "platform"])["eta_min"]
         .mean()
+        .round(0)
         .unstack("platform")
-        .reindex(columns=["rappi", "ubereats"])
         .dropna(axis=1, how="all")
     )
-    z = pivot.values
-    text = [
-        ["✓" if v == 1.0 else ("~" if (v is not None and not pd.isna(v) and 0 < v < 1) else "✗") for v in row]
-        for row in z
-    ]
-    fig = go.Figure(data=go.Heatmap(
-        z=z,
-        x=[PLATFORM_LABELS.get(c, c) for c in pivot.columns],
-        y=list(pivot.index),
-        colorscale=[[0, "#FEE2E2"], [0.5, "#FEF3C7"], [1, "#D1FAE5"]],
-        zmin=0, zmax=1,
-        text=text,
-        texttemplate="%{text}",
-        showscale=False,
-    ))
-    fig.update_layout(
-        template="plotly_white",
-        height=max(280, 22 * len(pivot)),
-        margin=dict(l=20, r=20, t=10, b=20),
-        font=dict(family="Inter, system-ui, sans-serif", size=12),
-    )
-    return fig
-
-
-def make_retail_fees_chart(df: pd.DataFrame) -> go.Figure:
-    """Bar: avg delivery fee by platform for retail (OXXO), available rows."""
-    av = df[(df["available"] == True) & (df["brand_id"] == "oxxo")]
-    fees = av.groupby("platform")[["delivery_fee_mxn", "discount_mxn"]].mean().round(1)
-    platforms_present = [p for p in ["rappi", "ubereats"] if p in fees.index]
+    sort_col = "rappi" if "rappi" in pivot.columns else pivot.columns[0]
+    pivot = pivot.sort_values(sort_col, ascending=True, na_position="first")
 
     fig = go.Figure()
-    for col, label, color in [
-        ("delivery_fee_mxn", "Delivery fee bruto", "#4C72B0"),
-        ("discount_mxn",     "Descuento aplicado", "#C44E52"),
-    ]:
-        y_vals = [fees.loc[p, col] if p in fees.index else 0 for p in platforms_present]
+    for platform in ["rappi", "ubereats"]:
+        if platform not in pivot.columns:
+            continue
+        vals = pivot[platform]
+        # Only plot non-NaN values; NaN zones simply have no bar
         fig.add_trace(go.Bar(
-            name=label,
-            x=[PLATFORM_LABELS[p] for p in platforms_present],
-            y=y_vals,
-            marker_color=color,
-            text=[f"${v:.1f}" for v in y_vals],
+            name=PLATFORM_LABELS[platform],
+            x=vals.tolist(),
+            y=list(pivot.index),
+            orientation="h",
+            marker_color=PLATFORM_COLORS[platform],
+            text=[f"{v:.0f} min" if not pd.isna(v) else "" for v in vals],
             textposition="outside",
         ))
 
     fig.update_layout(
         barmode="group",
         template="plotly_white",
-        height=280,
-        margin=dict(l=20, r=20, t=10, b=40),
-        yaxis_title="MXN",
+        height=max(340, len(pivot) * 36 + 80),
+        margin=dict(l=10, r=60, t=10, b=40),
+        xaxis=dict(title="minutos", range=[0, pivot.values[~pd.isna(pivot.values)].max() * 1.25]),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         font=dict(family="Inter, system-ui, sans-serif", size=12),
     )
     return fig
 
 
-def make_retail_promos_chart(df: pd.DataFrame) -> go.Figure:
-    """Bar: % of OXXO rows with visible promo text, by platform."""
-    rt = df[df["brand_id"] == "oxxo"]
-    pct = rt.groupby("platform")["has_promo"].mean().mul(100).round(1)
-    platforms = [p for p in ["rappi", "ubereats", "didi"] if p in pct.index]
+def make_delivery_cost_chart(df: pd.DataFrame) -> go.Figure:
+    """Grouped bar: delivery_fee_mxn and discount_mxn per platform (fast food)."""
+    ff = df[(df["available"] == True) & (df["brand_id"] == "mcdonalds")]
+    platforms = ["rappi", "ubereats"]
+    present = [p for p in platforms if p in ff["platform"].values]
+
+    fees = ff.groupby("platform")[["delivery_fee_mxn", "discount_mxn"]].mean().round(1)
+
+    fig = go.Figure()
+    delivery_vals = [fees.loc[p, "delivery_fee_mxn"] if p in fees.index else 0 for p in present]
+    discount_vals = [fees.loc[p, "discount_mxn"] if p in fees.index else 0 for p in present]
+
+    fig.add_trace(go.Bar(
+        name="Cargo de envío bruto",
+        x=[PLATFORM_LABELS[p] for p in present],
+        y=delivery_vals,
+        marker_color="#4C72B0",
+        text=[f"${v:.1f}" for v in delivery_vals],
+        textposition="outside",
+    ))
+    fig.add_trace(go.Bar(
+        name="Descuento aplicado",
+        x=[PLATFORM_LABELS[p] for p in present],
+        y=discount_vals,
+        marker_color="#C44E52",
+        text=[f"${v:.1f}" for v in discount_vals],
+        textposition="outside",
+    ))
+
+    # Net cost annotation
+    for p, fee, disc in zip(present, delivery_vals, discount_vals):
+        net = fee + disc
+        fig.add_annotation(
+            x=PLATFORM_LABELS[p],
+            y=max(abs(fee), 5) + 8,
+            text=f"<b>Neto: ${net:.1f}</b>",
+            showarrow=False,
+            font=dict(size=11, color="#374151"),
+        )
+
+    fig.add_hline(y=0, line_color="#E5E7EB", line_width=1)
+    fig.update_layout(
+        barmode="group",
+        template="plotly_white",
+        height=300,
+        margin=dict(l=20, r=20, t=40, b=40),
+        yaxis=dict(title="MXN"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        font=dict(family="Inter, system-ui, sans-serif", size=12),
+    )
+    return fig
+
+
+def make_promos_chart(df: pd.DataFrame) -> go.Figure:
+    """Bar: % of FF rows with promo text, rappi vs ubereats only (didi excluded — no data)."""
+    ff = df[df["brand_id"] == "mcdonalds"]
+    platforms = [p for p in ["rappi", "ubereats"] if p in ff["platform"].values]
+    pct = ff.groupby("platform")["has_promo"].mean().mul(100).round(1)
 
     fig = go.Figure(go.Bar(
         x=[PLATFORM_LABELS.get(p, p) for p in platforms],
-        y=[pct[p] for p in platforms],
+        y=[pct.get(p, 0) for p in platforms],
         marker_color=[PLATFORM_COLORS.get(p, "#888") for p in platforms],
-        text=[f"{pct[p]:.0f}%" for p in platforms],
+        text=[f"{pct.get(p, 0):.0f}%" for p in platforms],
         textposition="outside",
     ))
     fig.update_layout(
         template="plotly_white",
-        height=260,
+        height=280,
         margin=dict(l=20, r=20, t=10, b=40),
         yaxis=dict(title="%", range=[0, 120]),
         font=dict(family="Inter, system-ui, sans-serif", size=12),
@@ -811,23 +760,106 @@ def make_retail_promos_chart(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
+# ── SECTION 3: VARIABILIDAD GEOGRÁFICA ───────────────────────────────────────
+
+def make_geo_ff_chart(df: pd.DataFrame) -> go.Figure:
+    """Grouped bar: average total ticket by zone × platform (fast food)."""
+    av = df[(df["available"] == True) & (df["brand_id"] == "mcdonalds") & df["total_final_mxn"].notna()]
+    geo = (
+        av.groupby(["address_label", "platform"])["total_final_mxn"]
+        .mean()
+        .round(1)
+        .unstack("platform")
+    )
+    # Sort by rappi ticket descending
+    if "rappi" in geo.columns:
+        geo = geo.sort_values("rappi", ascending=False, na_position="last")
+
+    fig = go.Figure()
+    for platform in ["rappi", "ubereats"]:
+        if platform not in geo.columns:
+            continue
+        y_vals = geo[platform].tolist()
+        fig.add_trace(go.Bar(
+            name=PLATFORM_LABELS[platform],
+            x=list(geo.index),
+            y=y_vals,
+            marker_color=PLATFORM_COLORS[platform],
+            text=[f"${v:.0f}" if not pd.isna(v) else "" for v in y_vals],
+            textposition="outside",
+        ))
+
+    fig.update_layout(
+        barmode="group",
+        template="plotly_white",
+        height=360,
+        margin=dict(l=20, r=20, t=10, b=70),
+        yaxis_title="MXN",
+        xaxis_tickangle=-30,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        font=dict(family="Inter, system-ui, sans-serif", size=12),
+    )
+    return fig
+
+
+def make_retail_avail_chart(df: pd.DataFrame) -> go.Figure:
+    """Horizontal grouped bar: OXXO availability % by zone × platform."""
+    rt = df[df["brand_id"] == "oxxo"]
+    pivot = (
+        rt.groupby(["address_label", "platform"])["available"]
+        .mean()
+        .mul(100).round(0)
+        .unstack("platform")
+        .reindex(columns=["rappi", "ubereats"])
+        .dropna(axis=1, how="all")
+    )
+    # Sort by UE availability ascending so gaps appear at top
+    sort_col = "ubereats" if "ubereats" in pivot.columns else pivot.columns[0]
+    pivot = pivot.sort_values(sort_col, ascending=True, na_position="first")
+
+    fig = go.Figure()
+    for platform in ["rappi", "ubereats"]:
+        if platform not in pivot.columns:
+            continue
+        vals = pivot[platform].tolist()
+        fig.add_trace(go.Bar(
+            name=PLATFORM_LABELS[platform],
+            x=vals,
+            y=list(pivot.index),
+            orientation="h",
+            marker_color=PLATFORM_COLORS[platform],
+            text=[f"{v:.0f}%" for v in vals],
+            textposition="outside",
+        ))
+
+    fig.update_layout(
+        barmode="group",
+        template="plotly_white",
+        height=max(340, len(pivot) * 36 + 80),
+        margin=dict(l=10, r=60, t=10, b=40),
+        xaxis=dict(title="% disponible", range=[0, 130]),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        font=dict(family="Inter, system-ui, sans-serif", size=12),
+    )
+    return fig
+
+
 def compose_html(df: pd.DataFrame) -> str:
-    """Build and return the complete HTML report string."""
     stats = compute_stats(df)
+    s = stats
 
     figs = {
-        "chart-ff-prices":  make_price_chart(df),
-        "chart-ff-eta":     make_eta_chart(df),
-        "chart-ff-fees":    make_fees_chart(df),
-        "chart-ff-promos":  make_promos_chart(df),
-        "chart-rt-prices":  make_retail_price_chart(df),
-        "chart-rt-avail":   make_retail_avail_chart(df),
-        "chart-rt-fees":    make_retail_fees_chart(df),
-        "chart-rt-promos":  make_retail_promos_chart(df),
-        "chart-geo":        make_geo_chart(df),
+        "chart-ff-prices":   make_ff_price_chart(df),
+        "chart-combo-geo":   make_combo_by_zone_chart(df),
+        "chart-rt-prices":   make_retail_price_chart(df),
+        "chart-eta-ff":      make_eta_chart(df, brand_id="mcdonalds"),
+        "chart-eta-rt":      make_eta_chart(df, brand_id="oxxo"),
+        "chart-delivery":    make_delivery_cost_chart(df),
+        "chart-promos":      make_promos_chart(df),
+        "chart-geo-ff":      make_geo_ff_chart(df),
+        "chart-rt-avail":    make_retail_avail_chart(df),
     }
     cd = {k: _fig_div(v, k) for k, v in figs.items()}
-    s = stats
 
     return f"""<!DOCTYPE html>
 <html lang="es">
@@ -848,22 +880,10 @@ def compose_html(df: pd.DataFrame) -> str:
       <a href="#exec-summary">Executive Summary</a>
     </div>
     <div class="section-group">
-      <div class="section-label">Fast Food (McD)</div>
-      <a href="#ff-precios">01 Precios</a>
-      <a href="#ff-eta">02 Tiempos de entrega</a>
-      <a href="#ff-fees">03 Fees</a>
-      <a href="#ff-promos">04 Promociones</a>
-    </div>
-    <div class="section-group">
-      <div class="section-label">Retail (OXXO)</div>
-      <a href="#rt-precios">05 Precios</a>
-      <a href="#rt-avail">06 Disponibilidad</a>
-      <a href="#rt-fees">07 Fees</a>
-      <a href="#rt-promos">08 Promociones</a>
-    </div>
-    <div class="section-group">
-      <div class="section-label">Cruzado</div>
-      <a href="#geo">09 Variabilidad geográfica</a>
+      <div class="section-label">Análisis</div>
+      <a href="#precios">01 Posicionamiento de precios</a>
+      <a href="#operacional">02 Ventaja operacional</a>
+      <a href="#geo">03 Variabilidad geográfica</a>
     </div>
     <div class="section-group">
       <div class="section-label">Conclusiones</div>
@@ -895,139 +915,152 @@ def compose_html(df: pd.DataFrame) -> str:
     {_exec_summary_html(df, s)}
   </section>
 
-  <!-- FAST FOOD SECTIONS -->
-  <section id="ff-precios">
-    <h2><span class="section-number">01</span>Posicionamiento de precios — Fast Food (McDonald's)</h2>
+  <!-- SECCIÓN 1: POSICIONAMIENTO DE PRECIOS -->
+  <section id="precios">
+    <h2><span class="section-number">01</span>Posicionamiento de precios</h2>
+
+    <h3>Fast Food — McDonald's</h3>
     <p style="color:#6B7280;font-size:13px;margin-bottom:12px;">
-      Precio unitario promedio por SKU y plataforma — filas disponibles únicamente.
+      Precio unitario promedio por SKU y plataforma (filas disponibles). Big Mac y McNuggets: precio uniforme entre zonas.
     </p>
     {cd["chart-ff-prices"]}
     <div class="reading">
-      <strong>Lectura:</strong> Rappi y Uber Eats tienen <strong>paridad de precio de producto</strong>
-      en los 3 SKUs de fast food: Big Mac ~${s['ff_price_bigmac_rappi']:.0f} MXN, McNuggets ~${s['ff_price_nuggets_rappi']:.0f} MXN,
-      Combo ~${s['ff_price_combo_rappi']:.0f} MXN (Rappi) vs ${s['ff_price_bigmac_ue']:.0f} / ${s['ff_price_nuggets_ue']:.0f} / ${s['ff_price_combo_ue']:.0f} MXN (UberEats).
-      La diferenciación competitiva <strong>no ocurre en el precio del producto</strong> sino en fees,
-      ETA y comunicación de promociones — ver secciones siguientes.
+      <strong>Lectura:</strong> Big Mac (~${s['ff_price_bigmac_rappi']:.0f} MXN) y McNuggets 10pz (~${s['ff_price_nuggets_rappi']:.0f} MXN)
+      tienen <strong>paridad exacta entre Rappi y Uber Eats</strong> en todas las zonas.
+      La diferenciación competitiva en fast food <strong>no ocurre en el precio de producto estándar</strong>.
     </div>
-  </section>
 
-  <section id="ff-eta">
-    <h2><span class="section-number">02</span>Ventaja operacional — Tiempos de entrega (Fast Food)</h2>
+    <h3 style="margin-top:28px;">Combo Big Mac — variabilidad por zona (Rappi)</h3>
     <p style="color:#6B7280;font-size:13px;margin-bottom:12px;">
-      ETA promedio (minutos) por zona × plataforma. Colores más oscuros = más rápido.
+      Precio del Combo Big Mac med. por zona. Uber Eats mantiene $169 MXN uniforme en todas las zonas.
     </p>
-    {cd["chart-ff-eta"]}
+    {cd["chart-combo-geo"]}
     <div class="reading">
-      <strong>Lectura:</strong> Uber Eats entrega entre <strong>{s['ff_eta_ue_min']} y {s['ff_eta_ue_max']} min</strong>;
-      Rappi entre <strong>{s['ff_eta_rappi_min']} y {s['ff_eta_rappi_max']} min</strong>.
-      Las únicas zonas donde Rappi empata en velocidad son <strong>Roma Norte</strong> y <strong>Santa Fe</strong> (ambas {s['ff_eta_rappi_min']} min).
-      En zonas periféricas (Alvaro Obregón 49 min, Insurgentes Sur 35 min, Gustavo A. Madero 35 min)
-      la brecha llega a <strong>2–3×</strong> — las de mayor riesgo de churn.
+      <strong>Lectura:</strong> Mientras Uber Eats ofrece el Combo Big Mac a <strong>precio fijo de $169 MXN</strong> en todas las zonas,
+      Rappi muestra <strong>precios de $208–$218 MXN en al menos 4 zonas</strong> (Atizapan, Coyoacan, Del Valle, Naucalpan).
+      Esto eleva el promedio de Rappi a ~${s['ff_price_combo_rappi']:.0f} MXN.
+      Un usuario en Coyoacan o Naucalpan paga hasta <strong>29% más en Rappi por el mismo combo</strong>.
     </div>
-  </section>
 
-  <section id="ff-fees">
-    <h2><span class="section-number">03</span>Estructura de fees — Fast Food</h2>
+    <h3 style="margin-top:28px;">Retail — OXXO</h3>
     <p style="color:#6B7280;font-size:13px;margin-bottom:12px;">
-      Desglose promedio del ticket: precio producto + delivery fee + service fee + descuento.
-    </p>
-    {cd["chart-ff-fees"]}
-    <div class="reading">
-      <strong>Lectura:</strong> Rappi muestra un <strong>delivery fee promedio de ${s['ff_delivery_rappi']:.0f} MXN</strong> y aplica
-      un <strong>descuento de ${s['ff_discount_rappi']:.0f} MXN</strong> — resultado neto: $0.
-      Uber Eats expone directamente <strong>delivery fee = $0</strong>.
-      Mismo resultado económico para el usuario, <strong>dos narrativas opuestas</strong>:
-      UberEats vende "envío gratis"; Rappi entrega el beneficio en silencio y pierde el crédito psicológico.
-    </div>
-  </section>
-
-  <section id="ff-promos">
-    <h2><span class="section-number">04</span>Estrategia promocional — Fast Food</h2>
-    <p style="color:#6B7280;font-size:13px;margin-bottom:12px;">
-      % de filas con texto promocional visible al usuario (sin login).
-    </p>
-    {cd["chart-ff-promos"]}
-    {_promo_table_html(df, brand_id="mcdonalds")}
-    <div class="reading">
-      <strong>Lectura:</strong> <strong>Uber Eats comunica promos en el {s['ff_promo_pct_ue']:.0f}% del menú visitado</strong>
-      ("envío gratis usuarios nuevos", "2–3 ofertas disponibles").
-      <strong>Rappi muestra {s['ff_promo_pct_rappi']:.0f}% texto promocional</strong> aunque internamente aplica un descuento
-      numérico equivalente. Uber Eats convierte cada impresión de menú en un <em>call-to-action</em> de adquisición;
-      Rappi pierde esa oportunidad.
-    </div>
-  </section>
-
-  <!-- RETAIL SECTIONS -->
-  <section id="rt-precios">
-    <h2><span class="section-number">05</span>Posicionamiento de precios — Retail (OXXO)</h2>
-    <p style="color:#6B7280;font-size:13px;margin-bottom:12px;">
-      Precio unitario promedio por SKU y plataforma — filas disponibles.
+      Precio unitario promedio por SKU y plataforma (filas disponibles únicamente).
     </p>
     {cd["chart-rt-prices"]}
     <div class="reading">
-      <strong>Lectura:</strong> <strong>Rappi tiene precios retail sistemáticamente más bajos que UberEats.</strong>
+      <strong>Lectura:</strong> <strong>Rappi tiene precios retail sistemáticamente más bajos que Uber Eats.</strong>
       Coca-Cola 500ml: Rappi ${s['rt_price_coca_rappi']:.1f} vs UberEats ${s['rt_price_coca_ue']:.1f} MXN
       (+{((s['rt_price_coca_ue']/s['rt_price_coca_rappi'])-1)*100:.0f}% más caro en UE).
       Agua 1L: Rappi ${s['rt_price_agua_rappi']:.1f} vs UberEats ${s['rt_price_agua_ue']:.1f} MXN
       (+{((s['rt_price_agua_ue']/s['rt_price_agua_rappi'])-1)*100:.0f}% más caro en UE).
-      Esta ventaja de precio es <strong>real y no comunicada</strong> al usuario.
+      Esta ventaja de precio es <strong>real, consistente entre zonas y no comunicada</strong> al usuario.
     </div>
   </section>
 
-  <section id="rt-avail">
-    <h2><span class="section-number">06</span>Disponibilidad por zona — Retail (OXXO)</h2>
+  <!-- SECCIÓN 2: VENTAJA OPERACIONAL -->
+  <section id="operacional">
+    <h2><span class="section-number">02</span>Ventaja / desventaja operacional</h2>
+
+    <h3>Tiempos de entrega — Fast Food (McDonald's)</h3>
     <p style="color:#6B7280;font-size:13px;margin-bottom:12px;">
-      Verde = disponible · amarillo = parcial · rojo = no disponible
+      ETA promedio (minutos) por zona × plataforma. Solo se consideran filas con ETA reportado (&gt; 0).
+      Zonas ordenadas de mayor a menor ETA de Rappi. DiDi Food excluido: sin datos web.
+    </p>
+    {cd["chart-eta-ff"]}
+    <div class="reading">
+      <strong>Lectura:</strong> Uber Eats entrega entre <strong>{s['ff_eta_ue_min']} y {s['ff_eta_ue_max']} min</strong>;
+      Rappi entre <strong>{s['ff_eta_rappi_min']} y {s['ff_eta_rappi_max']} min</strong>.
+      Las únicas zonas donde Rappi empata en velocidad son <strong>Roma Norte y Santa Fe</strong> ({s['ff_eta_rappi_min']} min).
+      En zonas periféricas como Alvaro Obregón o Gustavo A. Madero la brecha llega a <strong>2–3×</strong>,
+      representando el mayor riesgo de churn del análisis.
+    </div>
+
+    <h3 style="margin-top:28px;">Tiempos de entrega — Retail (OXXO)</h3>
+    <p style="color:#6B7280;font-size:13px;margin-bottom:12px;">
+      ETA promedio (minutos) por zona × plataforma. Solo filas con ETA reportado (&gt; 0).
+    </p>
+    {cd["chart-eta-rt"]}
+    <div class="reading">
+      <strong>Lectura:</strong> En el vertical retail, Uber Eats entrega entre <strong>{s['rt_eta_ue_min']} y {s['rt_eta_ue_max']} min</strong>;
+      Rappi entre <strong>{s['rt_eta_rappi_min']} y {s['rt_eta_rappi_max']} min</strong>.
+      La brecha operacional en retail es consistente con la observada en fast food.
+    </div>
+
+    <h3 style="margin-top:28px;">Costos de entrega</h3>
+    <p style="color:#6B7280;font-size:13px;margin-bottom:12px;">
+      Cargo de envío bruto y descuento aplicado por plataforma — McDonald's, promedio de las zonas donde se pudo capturar el dato.
+    </p>
+    <p style="background:#FEF3C7;border-left:3px solid #F59E0B;padding:10px 14px;border-radius:0 4px 4px 0;font-size:12.5px;color:#92400E;margin-bottom:12px;">
+      <strong>Nota metodológica:</strong> En una parte de los scrapes no fue posible capturar el cargo de envío
+      (el dato no estaba expuesto en la página o fue bloqueado). Los valores del gráfico corresponden únicamente
+      a las observaciones donde el campo fue efectivamente scrapeado, por lo que pueden no ser representativos
+      de la totalidad de los casos.
+    </p>
+    {cd["chart-delivery"]}
+    <div class="reading">
+      <strong>Lectura:</strong> En los casos donde se pudo capturar el dato, Rappi cobra un
+      <strong>cargo de envío promedio de ~${s['ff_delivery_rappi']:.0f} MXN</strong>
+      y aplica un descuento equivalente — el costo neto para el usuario es <strong>$0</strong>, igual que en Uber Eats.
+      Sin embargo la mecánica es radicalmente distinta: UE expone "$0 envío" directamente;
+      Rappi lo hace vía descuento interno <strong>invisible</strong> para el usuario.
+      <strong>Oportunidad:</strong> en todos los pedidos donde se aplica un descuento, Rappi podría convertirlo
+      en un aviso de promoción visible ("¡Envío gratis en este pedido!") sin costo incremental — capturando
+      el crédito psicológico que hoy le cede a Uber Eats.
+      Para retail (OXXO), ambas plataformas tienen cargo y descuento en $0.
+    </div>
+
+    <h3 style="margin-top:28px;">Estrategia promocional</h3>
+    <p style="color:#6B7280;font-size:13px;margin-bottom:12px;">
+      % de filas con texto promocional visible al usuario (sin login) — McDonald's.
+      DiDi Food excluido: sin datos web disponibles.
+    </p>
+    {cd["chart-promos"]}
+    {_promo_table_html(df, brand_id="mcdonalds")}
+    <div class="reading">
+      <strong>Lectura:</strong> <strong>Uber Eats comunica promos en el {s['ff_promo_pct_ue']:.0f}% del menú visitado</strong>
+      ("envío gratis usuarios nuevos", "2–3 ofertas disponibles").
+      <strong>Rappi muestra {s['ff_promo_pct_rappi']:.0f}% texto promocional</strong> aunque internamente aplica descuentos equivalentes.
+      En retail (OXXO), ninguna plataforma muestra texto promocional —
+      lo que es especialmente llamativo dado que Rappi tiene ventaja real de precio de {((s['rt_price_coca_ue']/s['rt_price_coca_rappi'])-1)*100:.0f}%–{((s['rt_price_agua_ue']/s['rt_price_agua_rappi'])-1)*100:.0f}% frente a UE.
+    </div>
+  </section>
+
+  <!-- SECCIÓN 3: VARIABILIDAD GEOGRÁFICA -->
+  <section id="geo">
+    <h2><span class="section-number">03</span>Variabilidad geográfica</h2>
+
+    <h3>Ticket final por zona — Fast Food (McDonald's)</h3>
+    <p style="color:#6B7280;font-size:13px;margin-bottom:12px;">
+      Ticket final promedio (precio producto + delivery fee + descuento) por zona × plataforma.
+      {len(s['zones'])} zonas con datos disponibles.
+    </p>
+    {cd["chart-geo-ff"]}
+    <div class="reading">
+      <strong>Lectura:</strong> El precio base en McDonald's es nacional, por lo que la variabilidad geográfica refleja
+      la combinación de <strong>precio del producto</strong> (Combo caro en ciertas zonas) y
+      <strong>fee structure</strong> (delivery fee neto).
+      Las zonas con ticket más alto en Rappi coinciden con las que tienen precio de Combo elevado
+      (Atizapan, Coyoacan, Del Valle, Naucalpan).
+      Las zonas con "N/D" en una plataforma indican que esa plataforma no tiene cobertura disponible en la zona.
+    </div>
+
+    <h3 style="margin-top:28px;">Disponibilidad por zona — Retail (OXXO)</h3>
+    <p style="color:#6B7280;font-size:13px;margin-bottom:12px;">
+      % de SKUs disponibles por zona. Rappi {s['rt_avail_rappi']}/{s['rt_total_rappi']} observaciones disponibles · Uber Eats {s['rt_avail_ue']}/{s['rt_total_ue']}.
+    </p>
+    <p style="background:#FEF3C7;border-left:3px solid #F59E0B;padding:10px 14px;border-radius:0 4px 4px 0;font-size:12.5px;color:#92400E;margin-bottom:12px;">
+      <strong>Nota metodológica:</strong> Algunos casos de "no disponible" en Uber Eats pueden no reflejar
+      indisponibilidad real del servicio. Durante el scraping, ciertos requests de UE fueron bloqueados
+      o devolvieron respuestas incompletas, lo que se registró como no disponible.
+      Los datos de Uber Eats en este gráfico deben interpretarse como <em>cota inferior</em> de su cobertura real.
     </p>
     {cd["chart-rt-avail"]}
     <div class="reading">
-      <strong>Lectura:</strong> Rappi tiene disponibilidad de OXXO en <strong>{s['rt_avail_rappi']}/{s['rt_total_rappi']} zonas</strong> ({s['rt_avail_rappi']/s['rt_total_rappi']*100:.0f}%).
-      UberEats tiene <strong>{s['rt_avail_ue']}/{s['rt_total_ue']} zonas</strong> ({s['rt_avail_ue']/s['rt_total_ue']*100:.0f}%).
-      Rappi lidera en cobertura Y en precio — la combinación de ambas ventajas hace del vertical retail
-      la <strong>mayor oportunidad de diferenciación no explotada</strong> del análisis.
-    </div>
-  </section>
-
-  <section id="rt-fees">
-    <h2><span class="section-number">07</span>Estructura de fees — Retail (OXXO)</h2>
-    <p style="color:#6B7280;font-size:13px;margin-bottom:12px;">
-      Delivery fee bruto y descuento aplicado por plataforma en pedidos OXXO.
-    </p>
-    {cd["chart-rt-fees"]}
-    <div class="reading">
-      <strong>Lectura:</strong> La estructura de fees en retail sigue el mismo patrón que en fast food —
-      Rappi aplica un fee y luego un descuento equivalente, UberEats cobra $0 directo.
-      El resultado neto para el usuario es comparable, pero la narrativa nuevamente favorece a UberEats.
-    </div>
-  </section>
-
-  <section id="rt-promos">
-    <h2><span class="section-number">08</span>Estrategia promocional — Retail (OXXO)</h2>
-    <p style="color:#6B7280;font-size:13px;margin-bottom:12px;">
-      % de filas con texto promocional visible al usuario (sin login), vertical retail.
-    </p>
-    {cd["chart-rt-promos"]}
-    {_promo_table_html(df, brand_id="oxxo")}
-    <div class="reading">
-      <strong>Lectura:</strong> Ninguna plataforma muestra texto promocional visible en el vertical retail.
-      Rappi {s['rt_promo_pct_rappi']:.0f}%, UberEats {s['rt_promo_pct_ue']:.0f}%.
-      Dado que Rappi tiene ventaja real de precio ({((s['rt_price_coca_ue']/s['rt_price_coca_rappi'])-1)*100:.0f}%–{((s['rt_price_agua_ue']/s['rt_price_agua_rappi'])-1)*100:.0f}% más barato),
-      el silencio promocional en retail es la mayor oportunidad de comunicación sin costo incremental.
-    </div>
-  </section>
-
-  <!-- GEO -->
-  <section id="geo">
-    <h2><span class="section-number">09</span>Variabilidad geográfica — Fast Food</h2>
-    <p style="color:#6B7280;font-size:13px;margin-bottom:12px;">
-      Ticket final promedio por zona × plataforma — McDonald's, filas disponibles.
-    </p>
-    {cd["chart-geo"]}
-    <div class="reading">
-      <strong>Lectura:</strong> El precio de producto es nacional y uniforme en McDonald's, por lo que
-      la variabilidad geográfica refleja principalmente <strong>disponibilidad</strong> (qué zonas cubrió cada plataforma)
-      y <strong>fee structure</strong> (delivery fee, descuentos).
-      El análisis cubre {len(s['zones'])} zonas: {', '.join(s['zones'][:8])}{'...' if len(s['zones']) > 8 else ''}.
+      <strong>Lectura:</strong> Rappi tiene cobertura de OXXO en <strong>{s['rt_avail_rappi']}/{s['rt_total_rappi']} zonas</strong>
+      ({s['rt_avail_rappi']/s['rt_total_rappi']*100:.0f}%) vs Uber Eats <strong>{s['rt_avail_ue']}/{s['rt_total_ue']} zonas</strong>
+      ({s['rt_avail_ue']/s['rt_total_ue']*100:.0f}%).
+      Rappi lidera en cobertura — combinado con la ventaja de precio, el vertical retail es la
+      <strong>mayor oportunidad de diferenciación no explotada</strong> del análisis.
     </div>
   </section>
 
@@ -1045,16 +1078,16 @@ def compose_html(df: pd.DataFrame) -> str:
       <li><strong>Snapshot único</strong> ({s['snapshot_date']}, ~02:00 UTC). Sin variabilidad temporal — un horario de almuerzo o cena podría modificar los ETAs significativamente.</li>
       <li><strong>Usuario anónimo (sin login).</strong> Fees y promos reflejan la oferta de adquisición; usuarios Prime/recurrentes verían condiciones distintas.</li>
       <li><strong>DiDi sin cobertura cuantitativa</strong> — limitación estructural (app-only en CDMX). Mystery shopping manual sería el próximo paso.</li>
-      <li><strong>Cobertura asimétrica:</strong> no todas las zonas tienen datos de ambas plataformas en fast food. La comparación ETA es válida solo donde ambas plataformas tienen datos.</li>
+      <li><strong>Cobertura asimétrica:</strong> no todas las zonas tienen datos de ambas plataformas. La comparación ETA es válida solo donde ambas plataformas tienen cobertura simultánea.</li>
     </ul>
     <div class="next-steps">
       <h3>Próximos pasos sugeridos</h3>
       <ol>
         <li>Correr el scraper en 3 horarios (almuerzo 13h / cena 20h / madrugada 02h) y comparar varianza intra-día de ETAs en las 5 zonas con mayor brecha.</li>
+        <li>Auditar el contrato de precios con McDonald's para el Combo en Atizapan, Coyoacan, Del Valle y Naucalpan — confirmar si el diferencial es operacionalmente justificado.</li>
         <li>Lanzar campaña A/B de comunicación de precio retail ("OXXO más barato en Rappi") — bajo costo, alto potencial de diferenciación.</li>
         <li>Mystery shopping manual de DiDi en Iztapalapa y Ecatepec para punto de comparación cualitativo.</li>
         <li>Login real + comparación logueado vs anónimo para cuantificar el valor del programa de fidelidad de cada plataforma.</li>
-        <li>Expandir a 50+ zonas para significancia estadística en análisis geográfico.</li>
       </ol>
     </div>
   </section>
@@ -1062,7 +1095,7 @@ def compose_html(df: pd.DataFrame) -> str:
   <footer>
     <strong>Metodología:</strong> Datos recolectados mediante scraping web ético (robots.txt respetado,
     rate limiting 1.5s entre requests, user-agent Chrome desktop) en {s['snapshot_date']}.
-    Plataformas: Rappi MX, Uber Eats MX, DiDi Food MX.
+    Plataformas: Rappi MX, Uber Eats MX, DiDi Food MX (app-only, sin datos web).
     {len(s['zones'])} zonas analizadas: {', '.join(s['zones'])}.
     SKUs: Big Mac, McNuggets 10pz, Combo Big Mac med., Coca-Cola 500ml, Agua 1L.
     Sin login — oferta de usuario anónimo únicamente.<br>
