@@ -29,6 +29,7 @@ import asyncio
 import json
 import logging
 import re
+from pathlib import Path
 from typing import Any, Sequence
 
 from playwright.async_api import (
@@ -49,6 +50,22 @@ PAGE_TIMEOUT_MS = 30_000
 STOREFRONT_TIMEOUT_MS = 25_000
 # URL final tras redirect: /restaurantes/<store_id>-<slug>
 STORE_URL_PATTERN = re.compile(r"/restaurantes/(\d+)-")
+
+# Carpeta de evidencia (screenshots)
+EVIDENCE_DIR = Path("evidencia")
+EVIDENCE_DIR.mkdir(exist_ok=True)
+
+# Thresholds para detectar problemas
+MIN_HTML_SIZE_BYTES = 30_000  # Si HTML < esto, probablemente CAPTCHA o bloqueo
+
+
+def _is_likely_captcha_or_blocked(html_content: str) -> bool:
+    """Detecta si la página probablemente tiene CAPTCHA o está bloqueada.
+    
+    Heurística: si el HTML es muy pequeño (< MIN_HTML_SIZE_BYTES), probablemente
+    es una página de error, CAPTCHA o bloqueo.
+    """
+    return len(html_content) < MIN_HTML_SIZE_BYTES
 
 
 _DEFAULT_BRAND = Brand(
@@ -118,6 +135,30 @@ class RappiScraper(PlatformScraper):
             await page.goto(self.brand.nav_param, timeout=PAGE_TIMEOUT_MS)
         except PWTimeout:
             return None, "rappi:brand_page_timeout"
+        
+        # Detectar CAPTCHA/bloqueos tempranamente
+        await page.wait_for_timeout(2000)
+        initial_html = await page.content()
+        if _is_likely_captcha_or_blocked(initial_html):
+            log.warning("[%s/%s] Detectado posible CAPTCHA/bloqueo (HTML: %d bytes). Reintentando...", 
+                       self.brand.brand_id, address.label, len(initial_html))
+            await page.wait_for_timeout(8000)
+            
+            # Reintento
+            try:
+                await page.goto(self.brand.nav_param, timeout=PAGE_TIMEOUT_MS)
+                await page.wait_for_timeout(2000)
+                initial_html = await page.content()
+                
+                if _is_likely_captcha_or_blocked(initial_html):
+                    log.error("[%s/%s] CAPTCHA/bloqueo persiste (HTML: %d bytes)", 
+                             self.brand.brand_id, address.label, len(initial_html))
+                    screenshot_path = EVIDENCE_DIR / f"rappi_{address.label}_{self.brand.brand_id}_CAPTCHA.png"
+                    await page.screenshot(path=str(screenshot_path))
+                    log.warning("[%s] Screenshot CAPTCHA guardado en: %s", self.brand.brand_id, screenshot_path)
+                    return None, f"rappi:captcha_or_blocked_{self.brand.brand_id}"
+            except PWTimeout:
+                return None, "rappi:brand_page_timeout_after_captcha"
 
         # Modal address_capture: aparece en brand pages de restaurantes
         # (McDonald's) pero NO en URLs de tiendas concretas (ej. OXXO Express),
@@ -128,8 +169,11 @@ class RappiScraper(PlatformScraper):
                 '[data-testid="address_capture"]', timeout=8_000
             )
             modal_present = True
+            # Captura del modal de dirección
+            modal_screenshot_path = EVIDENCE_DIR / f"rappi_{address.label}_{self.brand.brand_id}_modal.png"
+            await page.screenshot(path=str(modal_screenshot_path))
         except PWTimeout:
-            log.info("[%s] sin modal address_capture", address.label)
+            log.debug("[%s] sin modal address_capture", address.label)
 
         if modal_present:
             try:
@@ -245,6 +289,11 @@ class RappiScraper(PlatformScraper):
         else:
             if not payload.get("jsonld"):
                 return None, "rappi:jsonld_missing"
+        
+        # Captura de pantalla del storefront
+        storefront_screenshot_path = EVIDENCE_DIR / f"rappi_{address.label}_{self.brand.brand_id}_storefront.png"
+        await page.screenshot(path=str(storefront_screenshot_path))
+        
         return payload, None
 
 
@@ -391,9 +440,12 @@ def _rows_from_storefront(
     )
 
     rows: list[ScrapeRow] = []
+    matches_count = 0
+    no_matches_count = 0
     for product in products:
         match = match_product(menu, product)
         if match is None:
+            no_matches_count += 1
             rows.append(
                 ScrapeRow(
                     platform="rappi",
@@ -415,6 +467,7 @@ def _rows_from_storefront(
             )
             continue
 
+        matches_count += 1
         unit = match.unit_price_mxn
         total = round(unit + delivery_fee_effective + service_fee + discount, 2)
         rows.append(
@@ -440,6 +493,15 @@ def _rows_from_storefront(
                 brand_id=brand_id,
             )
         )
+    
+    log.info(
+        "[%s/%s] coincidencias: %d/%d (no encontrados: %d)",
+        brand_id,
+        address.label,
+        matches_count,
+        len(products),
+        no_matches_count,
+    )
     return rows
 
 

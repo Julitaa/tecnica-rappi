@@ -47,7 +47,10 @@ import asyncio
 import base64
 import json
 import logging
+import os
+import random
 import re
+from pathlib import Path
 from typing import Any, Sequence
 from urllib.parse import quote
 
@@ -63,10 +66,40 @@ from .models import Address, Brand, Product, ScrapeRow
 
 log = logging.getLogger("scraper.ubereats")
 
-PAGE_TIMEOUT_MS = 30_000
-SEARCH_TIMEOUT_MS = 25_000
-STORE_TIMEOUT_MS = 20_000
+PAGE_TIMEOUT_MS = 90_000  # Aumentado para resolver CAPTCHA
+SEARCH_TIMEOUT_MS = 60_000  # Más tiempo en búsqueda
+STORE_TIMEOUT_MS = 50_000  # Más tiempo en tienda
 SEARCH_URL_TEMPLATE = "https://www.ubereats.com/mx/search?q={query}&pl={pl}"
+MANUAL_UNLOCK_WAIT_MS = 180_000  # 3 minutos para resolver CAPTCHA manualmente
+
+# Carpeta de evidencia (screenshots)
+EVIDENCE_DIR = Path("evidencia")
+EVIDENCE_DIR.mkdir(exist_ok=True)
+
+# Thresholds para detectar problemas
+MIN_HTML_SIZE_BYTES = 50_000  # Si HTML < esto, probablemente CAPTCHA o bloqueo
+
+
+def _random_delay(min_ms: int = 1000, max_ms: int = 5000) -> int:
+    """Genera delay aleatorio para simular comportamiento humano."""
+    return random.randint(min_ms, max_ms)
+
+
+async def _random_scroll(page, min_pixels: int = 200, max_pixels: int = 500) -> None:
+    """Scroll aleatorio para simular comportamiento humano."""
+    scroll_distance = random.randint(min_pixels, max_pixels)
+    scroll_direction = random.choice([-1, 1])
+    await page.evaluate(f"window.scrollBy(0, {scroll_distance * scroll_direction})")
+    await page.wait_for_timeout(_random_delay())
+
+
+def _is_likely_captcha_or_blocked(html_content: str) -> bool:
+    """Detecta si la página probablemente tiene CAPTCHA o está bloqueada.
+    
+    Heurística: si el HTML es muy pequeño (< MIN_HTML_SIZE_BYTES), probablemente
+    es una página de error, CAPTCHA o bloqueo.
+    """
+    return len(html_content) < MIN_HTML_SIZE_BYTES
 
 _DEFAULT_BRAND = Brand(
     brand_id="mcdonalds",
@@ -98,9 +131,10 @@ class UberEatsScraper(PlatformScraper):
     name = "ubereats"
     nav_url = "https://www.ubereats.com/mx"
 
-    def __init__(self, brand: Brand | None = None, headless: bool = True):
+    def __init__(self, brand: Brand | None = None, headless: bool = True, manual_captcha_unlock: bool = False):
         self.brand = brand or _DEFAULT_BRAND
         self.headless = headless
+        self.manual_captcha_unlock = manual_captcha_unlock
         # Filtro de anchors: /store/<prefix>...
         self._anchor_prefix = self.brand.nav_param.lower()
 
@@ -158,53 +192,128 @@ class UberEatsScraper(PlatformScraper):
             )
         except PWTimeout:
             return None, "ubereats:search_timeout"
-
-        # CSP en algunas storefront pages de UE bloquea wait_for_function
-        # (unsafe-eval). Usamos wait_for_selector para esperar el anchor del
-        # brand objetivo + un sleep para dar tiempo a hidratar el ETA. Filtra
-        # dummies por sufijo en el regex de extracción posterior.
-        prefix = self._anchor_prefix
+        
+        # Delay aleatorio después de navegar
+        await page.wait_for_timeout(_random_delay(8000, 12000))
+        
+        # Scroll aleatorio para simular comportamiento humano
         try:
-            await page.wait_for_selector(
-                f'a[href*="/store/{prefix}"]', timeout=SEARCH_TIMEOUT_MS
-            )
-        except PWTimeout:
-            return None, f"ubereats:no_results_for_{prefix}"
-        await page.wait_for_timeout(5000)
-
-        first = await page.evaluate(
-            f"""() => {{
-                const anchors = [...document.querySelectorAll('a[href*=\"/store/{prefix}\"]')];
-                const seen = new Set();
-                for (const a of anchors) {{
-                    if (/\\/store\\/{prefix}-dummy/i.test(a.href)) continue;
-                    const base = a.href.split('?')[0];
-                    if (seen.has(base)) continue;
-                    seen.add(base);
-                    let node = a.parentElement;
-                    let eta = null;
-                    for (let i = 0; i < 15 && node; i++) {{
-                        const t = node.innerText || '';
-                        const m = t.match(/(\\d+)\\s*min/);
-                        if (m) {{ eta = parseInt(m[1], 10); break; }}
-                        node = node.parentElement;
+            await _random_scroll(page)
+        except Exception as e:
+            log.debug("[%s] Scroll falló (puede no haber contenido): %s", self.brand.brand_id, e)
+        
+        debug_html = await page.content()
+        if _is_likely_captcha_or_blocked(debug_html):
+            log.warning("[%s] Detectado posible CAPTCHA/bloqueo (HTML: %d bytes). Reintentando...", 
+                       self.brand.brand_id, len(debug_html))
+            
+            # Si desbloqueo manual está habilitado, esperar a que se resuelva
+            if self.manual_captcha_unlock:
+                log.warning("[%s] Esperando resolución manual de CAPTCHA (3 minutos)...", self.brand.brand_id)
+                await page.wait_for_timeout(MANUAL_UNLOCK_WAIT_MS)
+                
+                # Recargar después de que el usuario resuelva
+                try:
+                    await page.reload(wait_until="domcontentloaded", timeout=PAGE_TIMEOUT_MS)
+                    await page.wait_for_timeout(_random_delay(5000, 8000))
+                    debug_html = await page.content()
+                    
+                    if _is_likely_captcha_or_blocked(debug_html):
+                        log.error("[%s] CAPTCHA persiste incluso después de intervención manual", self.brand.brand_id)
+                        screenshot_path = EVIDENCE_DIR / f"ubereats_{address.label}_{self.brand.brand_id}_CAPTCHA_MANUAL_FAILED.png"
+                        await page.screenshot(path=str(screenshot_path))
+                        return None, f"ubereats:captcha_or_blocked_{self.brand.brand_id}"
+                except PWTimeout:
+                    return None, "ubereats:search_timeout_after_manual_unlock"
+            else:
+                # Reintento automático sin intervención manual
+                await page.wait_for_timeout(_random_delay(8000, 12000))
+                
+                try:
+                    await page.goto(
+                        search_url, timeout=PAGE_TIMEOUT_MS, wait_until="domcontentloaded"
+                    )
+                    await page.wait_for_timeout(_random_delay(8000, 12000))
+                    debug_html = await page.content()
+                    
+                    if _is_likely_captcha_or_blocked(debug_html):
+                        log.error("[%s] CAPTCHA/bloqueo persiste después de reintento (HTML: %d bytes)", 
+                                 self.brand.brand_id, len(debug_html))
+                        screenshot_path = EVIDENCE_DIR / f"ubereats_{address.label}_{self.brand.brand_id}_CAPTCHA.png"
+                        await page.screenshot(path=str(screenshot_path))
+                        log.warning("[%s] Screenshot CAPTCHA guardado en: %s", self.brand.brand_id, screenshot_path)
+                        return None, f"ubereats:captcha_or_blocked_{self.brand.brand_id}"
+                except PWTimeout:
+                    return None, "ubereats:search_timeout_after_captcha"
+        
+        # Captura de pantalla del search
+        screenshot_path = EVIDENCE_DIR / f"ubereats_{address.label}_{self.brand.brand_id}_search.png"
+        await page.screenshot(path=str(screenshot_path))
+        
+        # Scroll aleatorio antes de buscar store
+        try:
+            await _random_scroll(page)
+        except Exception:
+            pass
+        
+        # En lugar de esperar selector (que puede fallar por remontaje del DOM),
+        # intentamos evaluar directamente — el DOM ya está hidratado según el debug.
+        prefix = self._anchor_prefix
+        
+        first = None
+        for attempt in range(3):  # Hasta 3 intentos con delays aleatorios
+            await page.wait_for_timeout(_random_delay(2000, 4000))
+            first = await page.evaluate(
+                f"""() => {{
+                    const anchors = [...document.querySelectorAll('a[href*=\"/store/{prefix}\"]')];
+                    const seen = new Set();
+                    for (const a of anchors) {{
+                        if (/\\/store\\/{prefix}-dummy/i.test(a.href)) continue;
+                        const base = a.href.split('?')[0];
+                        if (seen.has(base)) continue;
+                        seen.add(base);
+                        let node = a.parentElement;
+                        let eta = null;
+                        for (let i = 0; i < 15 && node; i++) {{
+                            const t = node.innerText || '';
+                            const m = t.match(/(\\d+)\\s*min/);
+                            if (m) {{ eta = parseInt(m[1], 10); break; }}
+                            node = node.parentElement;
+                        }}
+                        const name = (a.innerText || '').split('\\n')[0].trim();
+                        return {{storeUrl: base, eta, name}};
                     }}
-                    const name = (a.innerText || '').split('\\n')[0].trim();
-                    return {{storeUrl: base, eta, name}};
-                }}
-                return null;
-            }}"""
-        )
+                    return null;
+                }}"""
+            )
+            if first and first.get("storeUrl"):
+                log.debug("[%s] Store encontrado en intento %d", self.brand.brand_id, attempt + 1)
+                break
+            log.debug("[%s] Reintentando búsqueda de store (intento %d)...", self.brand.brand_id, attempt + 1)
+        
         if not first or not first.get("storeUrl"):
             return None, f"ubereats:no_results_for_{self._anchor_prefix}"
 
         store_url = f"{first['storeUrl']}?pl={quote(pl, safe='')}"
+        await page.wait_for_timeout(_random_delay(1000, 3000))  # Pausa aleatoria antes de ir a tienda
         try:
             await page.goto(
                 store_url, timeout=PAGE_TIMEOUT_MS, wait_until="domcontentloaded"
             )
         except PWTimeout:
             return None, "ubereats:store_timeout"
+        
+        await page.wait_for_timeout(_random_delay(5000, 10000))  # Pausa aleatoria después de cargar tienda
+        
+        # Scroll aleatorio en el storefront
+        try:
+            await _random_scroll(page)
+        except Exception:
+            pass
+        
+        # Captura de pantalla del storefront
+        storefront_screenshot_path = EVIDENCE_DIR / f"ubereats_{address.label}_{self.brand.brand_id}_storefront.png"
+        await page.screenshot(path=str(storefront_screenshot_path))
 
         # Restaurantes exponen hasMenu; tiendas (OXXO) NO. La CSP de las
         # storefront pages de tiendas bloquea wait_for_function (unsafe-eval),
@@ -212,7 +321,7 @@ class UberEatsScraper(PlatformScraper):
         # después en _rows_from_capture si hay productos.
         is_retail = self.brand.vertical == "retail"
         if is_retail:
-            await page.wait_for_timeout(5000)
+            await page.wait_for_timeout(_random_delay(3000, 7000))
         else:
             try:
                 await page.wait_for_function(
@@ -376,9 +485,14 @@ def _rows_from_capture(
 ) -> list[ScrapeRow]:
     restaurant = captured.get("restaurant") or {}
     menu = _iter_menu_items(restaurant) if restaurant else []
+    log.info("[%s] JSON-LD restaurant: %s", brand_id, bool(restaurant))
+    log.info("[%s] Menú capturado: %d items", brand_id, len(menu))
+    
     # Fallback retail: innerProducts del DOM (pares $precio\nname).
     if not menu:
-        for p in captured.get("innerProducts") or []:
+        inner_products = captured.get("innerProducts") or []
+        log.info("[%s] Intentando fallback retail: %d innerProducts", brand_id, len(inner_products))
+        for p in inner_products:
             try:
                 menu.append(
                     MenuItem(name_raw=p["name"], unit_price_mxn=float(p["price"]))
@@ -410,9 +524,12 @@ def _rows_from_capture(
     service_fee = 0.0  # no expuesto fuera del checkout (ver compliance.md)
 
     rows: list[ScrapeRow] = []
+    matches_count = 0
+    no_matches_count = 0
     for product in products:
         match = match_product(menu, product)
         if match is None:
+            no_matches_count += 1
             rows.append(
                 ScrapeRow(
                     platform="ubereats",
@@ -434,6 +551,7 @@ def _rows_from_capture(
             )
             continue
 
+        matches_count += 1
         unit = match.unit_price_mxn
         total = round(unit + delivery_fee_effective + service_fee + discount, 2)
         rows.append(
@@ -459,4 +577,13 @@ def _rows_from_capture(
                 brand_id=brand_id,
             )
         )
+    
+    log.info(
+        "[%s/%s] coincidencias: %d/%d (no encontrados: %d)",
+        brand_id,
+        address.label,
+        matches_count,
+        len(products),
+        no_matches_count,
+    )
     return rows
