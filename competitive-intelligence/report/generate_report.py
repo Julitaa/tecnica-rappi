@@ -362,28 +362,27 @@ def _promo_table_html(df: pd.DataFrame) -> str:
     )
 
 
-def _exec_summary_html(df: pd.DataFrame) -> str:
-    av = df[df["available"] == True]
-    rappi_count = len(av[av["platform"] == "rappi"])
-    ue_count = len(av[av["platform"] == "ubereats"])
-    didi_count = len(av[av["platform"] == "didi"])
+def _exec_summary_html(df: pd.DataFrame, stats: dict) -> str:
+    rappi_count = stats["n_rappi_avail"]
+    ue_count    = stats["n_ue_avail"]
+    didi_count  = stats["n_didi_avail"]
 
     rows = [
-        ("Posicionamiento de precios",
-         "Paridad exacta en fast food (Big Mac, McNuggets, Combo)",
+        (f"🍔 Fast Food — Precios",
+         f"Paridad exacta: Big Mac ~${stats['ff_price_bigmac_rappi']:.0f} (Rappi) vs ~${stats['ff_price_bigmac_ue']:.0f} (UE). Sin diferenciación en precio de producto.",
          "badge-yellow", "Paridad"),
-        ("Ventaja operacional (ETA)",
-         "Rappi 14–49 min vs Uber Eats 10–23 min — brecha crítica fuera de Roma Norte",
+        (f"🍔 Fast Food — ETA",
+         f"Rappi {stats['ff_eta_rappi_min']}–{stats['ff_eta_rappi_max']} min vs UberEats {stats['ff_eta_ue_min']}–{stats['ff_eta_ue_max']} min. Rappi solo empata en Roma Norte y Santa Fe (12 min).",
          "badge-red", "Desventaja"),
-        ("Estructura de fees",
-         "Mismo ticket final; Uber Eats lo narra como 'envío gratis', Rappi no comunica el descuento",
+        (f"🍔 Fast Food — Fees",
+         f"Mismo ticket neto. Rappi fee ${stats['ff_delivery_rappi']:.0f} + descuento ${stats['ff_discount_rappi']:.0f} = $0. UE $0 directo. UE gana la narrativa: '{stats['ff_promo_pct_ue']:.0f}% filas con promo visible' vs Rappi {stats['ff_promo_pct_rappi']:.0f}%.",
          "badge-yellow", "Desventaja narrativa"),
-        ("Estrategia promocional",
-         "Uber Eats: 60% filas con promo visible. Rappi: 0%. DiDi: sin datos.",
-         "badge-red", "Desventaja"),
-        ("Variabilidad geográfica",
-         "Rappi gana en Roma Norte. Pierde en Polanco / Del Valle por ETAs altos.",
-         "badge-yellow", "Zona-dependiente"),
+        (f"🛒 Retail (OXXO) — Precios",
+         f"Rappi más barato: Coca-Cola ${stats['rt_price_coca_rappi']:.1f} vs UE ${stats['rt_price_coca_ue']:.1f} (+{((stats['rt_price_coca_ue']/stats['rt_price_coca_rappi'])-1)*100:.0f}%). Agua ${stats['rt_price_agua_rappi']:.1f} vs UE ${stats['rt_price_agua_ue']:.1f} (+{((stats['rt_price_agua_ue']/stats['rt_price_agua_rappi'])-1)*100:.0f}%).",
+         "badge-green", "Ventaja precio"),
+        (f"🛒 Retail (OXXO) — Cobertura",
+         f"Rappi {stats['rt_avail_rappi']}/{stats['rt_total_rappi']} zonas disponibles. UberEats {stats['rt_avail_ue']}/{stats['rt_total_ue']}. Rappi lidera en disponibilidad y precio — ventaja no comunicada.",
+         "badge-green", "Ventaja cobertura"),
     ]
     header = (
         '<table class="exec-table">'
@@ -400,9 +399,9 @@ def _exec_summary_html(df: pd.DataFrame) -> str:
         )
     footer_note = (
         f'<p style="margin-top:12px;font-size:12px;color:#9CA3AF;">'
-        f'Muestra: {len(df)} observaciones — Rappi {rappi_count} disp. | '
+        f'Muestra: {stats["n_total"]} observaciones — Rappi {rappi_count} disp. | '
         f'Uber Eats {ue_count} disp. | DiDi {didi_count} disp. | '
-        f'3 plataformas × 6 zonas CDMX/EdoMex × 5 SKUs</p>'
+        f'3 plataformas x {len(stats["zones"])} zonas x 5 SKUs</p>'
     )
     return header + body + "</tbody></table>" + footer_note
 
