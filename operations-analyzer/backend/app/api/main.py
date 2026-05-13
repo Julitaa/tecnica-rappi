@@ -2,7 +2,7 @@ import json
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Query, Request
-from fastapi.responses import Response, PlainTextResponse
+from fastapi.responses import Response, PlainTextResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse
 
@@ -25,15 +25,26 @@ async def lifespan(app: FastAPI):
     app.state.repo = Repository(metrics_df, orders_df)
     app.state.chat = ChatService(app.state.repo)
     log.info("Data loaded: metrics=%s orders=%s", metrics_df.shape, orders_df.shape)
+    if not settings.use_mock_llm and not settings.openai_api_key:
+        log.warning("OPENAI_API_KEY not set; chat will fail. "
+                    "Set USE_MOCK_LLM=true to use mock responses.")
     yield
 
 
 app = FastAPI(title="Operations Analyzer API", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
-    allow_methods=["*"], allow_headers=["*"],
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    log.exception("Unhandled exception")
+    return JSONResponse(status_code=500,
+                        content={"error": str(exc), "type": type(exc).__name__})
 
 
 @app.get("/health")
