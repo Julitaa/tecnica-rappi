@@ -338,11 +338,12 @@ def _fig_div(fig: go.Figure, div_id: str) -> str:
     return pio.to_html(fig, full_html=False, include_plotlyjs=False, div_id=div_id)
 
 
-def _promo_table_html(df: pd.DataFrame) -> str:
+def _promo_table_html(df: pd.DataFrame, brand_id: str = None) -> str:
+    sub = df if brand_id is None else df[df["brand_id"] == brand_id]
     rows = []
     for platform in ["rappi", "ubereats", "didi"]:
         texts = (
-            df[(df["platform"] == platform) & df["has_promo"]]
+            sub[(sub["platform"] == platform) & sub["has_promo"]]
             ["promo_text"].dropna().unique()
         )
         color = PLATFORM_COLORS.get(platform, "#888")
